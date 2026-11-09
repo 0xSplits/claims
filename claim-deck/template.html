@@ -1,0 +1,122 @@
+<title>{{TITLE}}</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one claim per full-height slide, vertical scroll-snap. Each slide is a two-column card: the claim and its evidence on the left, a diagram on the right with the claim's path lit and everything else dimmed. A rail on the left shows every claim as a dot colored by evidence grade. */
+{{CSS}}
+html, body { height: 100%; }
+body { padding-block: 0; }
+.deck { height: 100%; overflow-y: auto; scroll-snap-type: y mandatory; scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { .deck { scroll-behavior: auto; } }
+.slide { min-height: 100%; scroll-snap-align: start; display: grid; align-content: center; padding-block: 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); box-sizing: border-box; }
+.card { width: min(1180px, 100%); margin-inline: auto; display: grid; grid-template-columns: minmax(300px, 5fr) minmax(0, 7fr); gap: 22px; align-items: start; }
+.card.one { grid-template-columns: 1fr; }
+.text { display: grid; gap: 12px; min-width: 0; }
+.kicker { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+.kicker .n { font-variant-numeric: tabular-nums; }
+.chip { font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; }
+.chip.proven { background: var(--ok-soft); color: var(--ok); } .chip.partial { background: var(--warn-soft); color: var(--warn); } .chip.asserted { background: var(--prev-soft); color: var(--prev); } .chip.gap { background: var(--bad-soft); color: var(--bad); } .chip.deviation { background: var(--accent-soft); color: var(--accent); }
+h1 { font-size: clamp(22px, 2.6vw, 30px); line-height: 1.2; }
+.claim-title { font-size: clamp(19px, 2.2vw, 25px); font-weight: 600; line-height: 1.25; margin: 0; text-wrap: balance; }
+.block { display: grid; gap: 4px; }
+.block h4 { margin: 0; font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.block p { margin: 0; font-size: 13.5px; max-width: 60ch; }
+.block.proof { border-left: 3px solid var(--ok); padding-left: 10px; } .block.gapb { border-left: 3px solid var(--bad); padding-left: 10px; } .block.riskb { border-left: 3px solid var(--warn); padding-left: 10px; }
+.src a { font-family: var(--mono); font-size: 11.5px; text-decoration: none; border-bottom: 1px dotted var(--accent); margin-right: 10px; }
+pre { font-size: 11.5px; }
+.fig { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; min-width: 0; }
+.fig .cap { font-size: 12px; color: var(--muted); padding: 2px 6px 6px; }
+.rail { position: fixed; left: max(8px, env(safe-area-inset-left, 0px)); top: 50%; transform: translateY(-50%); display: grid; gap: 6px; z-index: 5; }
+.rail a { width: 9px; height: 9px; border-radius: 50%; background: var(--line); display: block; border: 2px solid transparent; box-sizing: border-box; }
+.rail a.proven { background: var(--ok); } .rail a.partial { background: var(--warn); } .rail a.asserted { background: var(--prev); } .rail a.gap { background: var(--bad); } .rail a.deviation { background: var(--accent); } .rail a.cover { background: var(--muted); }
+.rail a.on { transform: scale(1.5); border-color: var(--fg); }
+.rail a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hint { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: 14px; font-size: 12px; color: var(--muted); background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; z-index: 5; font-variant-numeric: tabular-nums; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+.stats button { font: inherit; color: inherit; text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; cursor: pointer; }
+.stats button b { display: block; font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stats button span { font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.stats .proven b { color: var(--ok); } .stats .partial b { color: var(--warn); } .stats .asserted b { color: var(--prev); } .stats .gap b { color: var(--bad); } .stats .deviation b { color: var(--accent); }
+.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px; }
+.toc a { display: flex; gap: 8px; align-items: baseline; font-size: 13px; color: var(--fg); text-decoration: none; padding: 6px 8px; border-radius: 6px; border: 1px solid transparent; }
+.toc a:hover { border-color: var(--line); background: var(--panel); }
+.toc a i { width: 8px; height: 8px; border-radius: 50%; flex: none; display: inline-block; background: var(--c); position: relative; top: -1px; }
+.toc a .n { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.lead { font-size: 16px; }
+@media (max-width: 900px) { .card { grid-template-columns: 1fr; } .rail { display: none; } }
+</style>
+
+<nav class="rail" id="rail" aria-label="Claims"></nav>
+<div class="hint" id="hint"></div>
+<main class="deck" id="deck"></main>
+
+<script>
+{{JS}}
+</script>
+<script>
+window.DECK = {{DATA}};
+</script>
+<script>
+(() => {
+  const DECK = window.DECK, CLAIMS = DECK.claims;
+  const GH = `https://github.com/${DECK.repo}/blob/${DECK.sha}/`;
+  const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const link = (l) => `<a href="${GH}${esc(l.path)}#L${l.line}${l.endLine ? '-L' + l.endLine : ''}" target="_blank" rel="noopener">${esc(l.label || l.path.split('/').pop() + ' L' + l.line + (l.endLine ? '–' + l.endLine : ''))} ↗</a>`;
+  const links = (arr) => (arr && arr.length) ? `<div class="src">${arr.map(link).join('')}</div>` : '';
+  const S = { proven: 'Proven', partial: 'Partial', asserted: 'Asserted only', gap: 'Known gap', deviation: 'Spec deviation' };
+  const GRADE = {
+    proven: 'An automated test asserts this directly, against a real database where the claim is about SQL.',
+    partial: 'Tested for some cases or one side of a mirror; the untested side is named.',
+    asserted: 'The code reads as correct and a comment or the PR says so, but no test exercises it.',
+    gap: 'The author says it does not hold yet, and the code confirms it.',
+    deviation: 'The spec said one thing and the code does another, on purpose.',
+  };
+  const DOT = { proven: 'ok', partial: 'warn', asserted: 'prev', gap: 'bad', deviation: 'accent' };
+  const pad2 = (n) => String(n).padStart(2, '0');
+
+  const deck = document.getElementById('deck'), rail = document.getElementById('rail'), hint = document.getElementById('hint');
+  const counts = Object.fromEntries(Object.keys(S).map((k) => [k, CLAIMS.filter((c) => c.grade === k).length]));
+  const kicker = [DECK.repo && DECK.pr ? `${esc(DECK.repo)} #${DECK.pr}` : esc(DECK.repo || ''), DECK.ticket ? esc(DECK.ticket) : '', `${CLAIMS.length} claims`].filter(Boolean).map((t) => `<span>${t}</span>`).join('<span>·</span>');
+  const cover = document.createElement('section'); cover.className = 'slide'; cover.id = 'cover';
+  cover.innerHTML = `<div class="card one" style="gap:18px"><div class="text"><div class="kicker">${kicker}</div><h1 class="claim-title" style="font-size:clamp(24px,3vw,34px)">${esc(DECK.headline || 'Every claim this change makes, one per slide, each drawn as the path through the code that makes it true.')}</h1><p class="lead" style="color:var(--muted)">${esc(DECK.intro || 'Left side: the claim, the code that enforces it, the test that proves it, the gap if there is one. Right side: the flow, lifecycle, or trace with that claim\'s path lit and everything else dimmed. Arrow keys or scroll. Click a dot on the rail or a row below to jump.')}</p></div>
+    <div class="stats">${Object.entries(S).filter(([k]) => counts[k]).map(([k, v]) => `<button class="${k}" data-jump="${k}" title="${esc(GRADE[k])}"><b>${counts[k]}</b><span>${v}</span></button>`).join('')}</div>
+    <div class="toc">${CLAIMS.map((c, i) => `<a href="#c${i + 1}" style="--c: var(--${DOT[c.grade]})"><i></i><span class="n">${pad2(i + 1)}</span><span>${esc(c.title)}</span></a>`).join('')}</div></div>`;
+  deck.appendChild(cover);
+
+  CLAIMS.forEach((c, i) => {
+    const sec = document.createElement('section'); sec.className = 'slide'; sec.id = 'c' + (i + 1);
+    const noProof = !c.proof || /^none\b/i.test(c.proof);
+    sec.innerHTML = `<div class="card"><div class="text">
+      <div class="kicker"><span class="n">${pad2(i + 1)} / ${CLAIMS.length}</span><span class="chip ${c.grade}">${S[c.grade]}</span>${c.area ? `<span>${esc(c.area)}</span>` : ''}</div>
+      <h2 class="claim-title">${esc(c.title)}</h2>
+      <div class="block"><h4>${c.grade === 'deviation' ? 'Spec says · code does' : c.grade === 'gap' ? 'Where it fails' : 'Enforced by'}</h4><p>${esc(c.enforced)}</p>${c.code ? `<pre>${esc(c.code)}</pre>` : ''}${links(c.links)}</div>
+      <div class="block ${noProof ? 'gapb' : 'proof'}"><h4>${noProof ? 'Not tested' : 'Proven by'}</h4><p>${esc(c.proof || 'None.')}</p>${links(c.proofLinks)}</div>
+      ${c.risk ? `<div class="block riskb"><h4>${c.grade === 'gap' ? 'Status' : 'What is not covered'}</h4><p>${esc(c.risk)}</p></div>` : ''}
+    </div><div class="fig"><svg id="fig${i + 1}" role="img" aria-label="${esc(c.caption || c.title)}"></svg>${c.caption ? `<div class="cap">${esc(c.caption)}</div>` : ''}</div></div>`;
+    deck.appendChild(sec);
+  });
+
+  const slides = [...deck.querySelectorAll('.slide')];
+  slides.forEach((s, i) => { const a = document.createElement('a'); a.href = '#' + s.id; a.className = i === 0 ? 'cover' : CLAIMS[i - 1].grade; a.setAttribute('aria-label', i === 0 ? 'Overview' : 'Claim ' + i); a.addEventListener('click', (e) => { e.preventDefault(); s.scrollIntoView(); }); rail.appendChild(a); });
+  deck.querySelectorAll('.toc a').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); document.getElementById(a.getAttribute('href').slice(1)).scrollIntoView(); }));
+  deck.querySelectorAll('[data-jump]').forEach((b) => b.addEventListener('click', () => { const i = CLAIMS.findIndex((c) => c.grade === b.dataset.jump); if (i >= 0) document.getElementById('c' + (i + 1)).scrollIntoView(); }));
+
+  CLAIMS.forEach((c, i) => {
+    const d = c.diagram || { nodes: [], edges: [] };
+    Flow.render(document.getElementById('fig' + (i + 1)), { nodes: d.nodes || [], edges: d.edges || [], lanes: d.lanes || [], regions: d.regions || [], laneTop: d.lanes && d.lanes.length ? 34 : 0, colW: d.colW || 215, rowH: d.rowH || 84, nodeW: d.nodeW || 180, nodeH: d.nodeH || 50 });
+  });
+
+  const dots = [...rail.children]; let current = 0;
+  const setCurrent = (i) => { current = i; dots.forEach((d, j) => d.classList.toggle('on', j === i)); hint.textContent = i === 0 ? 'overview' : `${i} / ${CLAIMS.length} · ${S[CLAIMS[i - 1].grade]}`; };
+  const io = new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) setCurrent(slides.indexOf(e.target)); }), { root: deck, threshold: 0.6 });
+  slides.forEach((s) => io.observe(s));
+  document.addEventListener('keydown', (e) => {
+    if (e.target && /input|textarea|select/i.test(e.target.tagName)) return;
+    if (['ArrowDown', 'ArrowRight', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); slides[Math.min(current + 1, slides.length - 1)].scrollIntoView(); }
+    if (['ArrowUp', 'ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); slides[Math.max(current - 1, 0)].scrollIntoView(); }
+    if (e.key === 'Home') { e.preventDefault(); slides[0].scrollIntoView(); }
+  });
+  const h = location.hash.slice(1); const start = slides.find((s) => s.id === h); if (start) start.scrollIntoView();
+  setCurrent(0);
+})();
+</script>

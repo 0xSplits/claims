@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
+<style>
+/* Tokens match claim-deck's flow.css so grades read the same on both pages. */
+:root {
+  --bg: #f6f7f5; --panel: #ffffff; --fg: #1b1f1e; --muted: #5d6663; --line: #d9ded9;
+  --accent: #0f5f5c; --ok: #2c6e3a; --ok-soft: #dbead8; --warn: #a15a00; --warn-soft: #f6e7cf;
+  --bad: #a3322c; --bad-soft: #f4dcd9; --prev: #6b5b95; --prev-soft: #e7e1f3; --open: #8a938f; --open-soft: #eceeec;
+  --font: "IBM Plex Sans", system-ui, -apple-system, Segoe UI, sans-serif; --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #151817; --panel: #1d2120; --fg: #e8ebe8; --muted: #9aa49f; --line: #2f3634;
+  --accent: #6ec9c2; --ok: #7fc48d; --ok-soft: #1c3322; --warn: #e3a34b; --warn-soft: #3a2b12;
+  --bad: #e27b74; --bad-soft: #3d1f1d; --prev: #b8a6e0; --prev-soft: #2a2340; --open: #7d8783; --open-soft: #262b2a; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #151817; --panel: #1d2120; --fg: #e8ebe8; --muted: #9aa49f; --line: #2f3634;
+  --accent: #6ec9c2; --ok: #7fc48d; --ok-soft: #1c3322; --warn: #e3a34b; --warn-soft: #3a2b12;
+  --bad: #e27b74; --bad-soft: #3d1f1d; --prev: #b8a6e0; --prev-soft: #2a2340; --open: #7d8783; --open-soft: #262b2a; color-scheme: dark; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 14.5px; line-height: 1.5; }
+main { max-width: 1200px; margin: 0 auto; padding: 28px 16px 40px; display: grid; gap: 18px; }
+.eyebrow { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { margin: 4px 0 0; font-size: clamp(22px, 3vw, 30px); line-height: 1.2; font-weight: 600; text-wrap: balance; }
+.statement { margin: 0; max-width: 80ch; color: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 8px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; padding: 2px 10px; border-radius: 999px; font-variant-numeric: tabular-nums; }
+.pill i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.proven { background: var(--ok-soft); color: var(--ok); } .partial { background: var(--warn-soft); color: var(--warn); }
+.asserted { background: var(--prev-soft); color: var(--prev); } .gap { background: var(--bad-soft); color: var(--bad); }
+.open { background: var(--open-soft); color: var(--open); }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+#chart { width: 100%; }
+.hint { font-size: 12.5px; color: var(--muted); margin: 0; }
+.tip { max-width: 340px; white-space: normal; font-family: var(--font); font-size: 13px; line-height: 1.45; display: grid; gap: 6px; }
+.tip b { font-weight: 600; }
+.tip .meta { font-size: 12px; color: var(--muted); }
+.tip a { font-family: var(--mono); font-size: 11.5px; color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="eyebrow">Claim tree</div>
+    <h1 id="title"></h1>
+  </header>
+  <p class="statement" id="statement"></p>
+  <div class="legend" id="legend"></div>
+  <div class="panel"><div id="chart"></div></div>
+  <p class="hint">Click a node to open or close it. Proven branches start closed. Drag to pan. Hover for the note and evidence.</p>
+</main>
+<script>
+const PAGE = {{DATA}};
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const GRADE_VAR = { proven: '--ok', partial: '--warn', asserted: '--prev', gap: '--bad', open: '--open' };
+
+document.getElementById('title').textContent = PAGE.tree.name;
+document.getElementById('statement').textContent = PAGE.statement;
+document.getElementById('legend').innerHTML = Object.entries(PAGE.tally)
+  .map(([g, n]) => `<span class="pill ${g}"><i></i>${n} ${g}</span>`).join('');
+
+const leaves = (n) => (n.children?.length ? n.children.reduce((s, c) => s + leaves(c), 0) : 1);
+const el = document.getElementById('chart');
+el.style.height = `${Math.max(360, leaves(PAGE.tree) * 80 + 60)}px`;
+
+const tooltip = ({ data: n }) => {
+  const meta = [
+    n.enforcedBy && `enforced by ${esc(n.enforcedBy)}`,
+    n.liveFrom && `live from ${esc(n.liveFrom)}`,
+    n.review === 'reviewed' && `definition reviewed by ${esc(n.reviewed.by)}, ${esc(n.reviewed.date)}`,
+    n.review && n.review !== 'reviewed' && `definition ${esc(n.review)}`,
+    n.ref && `from ${esc(n.ref.split('/').pop())}`,
+  ].filter(Boolean).join(' · ');
+  return `<div class="tip">
+    <div><span class="pill ${n.grade}"><i></i>${n.grade}</span> <span class="meta">${esc(n.id)}</span></div>
+    <b>${esc(n.name)}</b>
+    ${n.note ? `<div>${esc(n.note)}</div>` : ''}
+    ${n.basis ? `<div class="meta">Basis: ${esc(n.basis)}</div>` : ''}
+    ${meta ? `<div class="meta">${meta}</div>` : ''}
+    ${n.source?.length ? '<div class="meta">Where we say it:</div>' : ''}
+    ${(n.source || []).map((e) => `<a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.label)}</a>`).join('')}
+    ${n.evidence?.length && n.source?.length ? '<div class="meta">Evidence:</div>' : ''}
+    ${(n.evidence || []).map((e) => `<a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.label)}</a>`).join('')}
+  </div>`;
+};
+
+const style = (n) => {
+  const color = css(GRADE_VAR[n.grade]);
+  return {
+    ...n,
+    name: n.ref ? `${n.name}  ↗` : n.name,
+    itemStyle: { color, borderColor: color },
+    // A branch's label sits above its dot so it never covers the edge to its middle child.
+    label: n.children?.length
+      ? { color: css('--fg'), position: 'top', align: 'left', verticalAlign: 'bottom', distance: 8, width: 200 }
+      : { color: css('--fg') },
+    children: (n.children || []).map(style),
+  };
+};
+
+const chart = echarts.init(el, null, { renderer: 'svg' });
+const draw = () => {
+  const narrow = el.clientWidth < 640;
+  const labelWidth = narrow ? 150 : 280;
+  chart.setOption({
+    tooltip: {
+      trigger: 'item', enterable: true, confine: true, formatter: tooltip,
+      backgroundColor: css('--panel'), borderColor: css('--line'), textStyle: { color: css('--fg') },
+      extraCssText: 'box-shadow: 0 6px 24px rgba(0,0,0,.12); border-radius: 8px;',
+    },
+    series: [{
+      type: 'tree',
+      data: [style(PAGE.tree)],
+      orient: 'LR',
+      top: 30, bottom: 30, left: narrow ? 16 : 40, right: labelWidth + 24,
+      // Wheel zoom would trap page scrolling on a chart taller than the screen.
+      roam: 'move',
+      initialTreeDepth: -1,
+      expandAndCollapse: true,
+      animationDuration: 300,
+      animationDurationUpdate: 400,
+      symbol: 'circle',
+      symbolSize: 13,
+      edgeShape: 'polyline',
+      lineStyle: { color: css('--line'), width: 1.5 },
+      label: {
+        position: 'right', verticalAlign: 'middle', align: 'left', distance: 10,
+        // About three lines at most; the tooltip carries the full claim.
+        formatter: ({ name }) => (name.length > 100 ? `${name.slice(0, 97).trimEnd()}…` : name),
+        width: labelWidth, overflow: 'break', lineHeight: 17,
+        fontFamily: css('--font'), fontSize: 13,
+      },
+      leaves: { label: { position: 'right', align: 'left' } },
+      emphasis: { focus: 'ancestor' },
+    }],
+  }, true);
+};
+draw();
+window.addEventListener('resize', () => { chart.resize(); draw(); });
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+</script>
+</body>
+</html>
