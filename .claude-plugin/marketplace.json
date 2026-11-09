@@ -1,0 +1,14 @@
+{
+  "name": "splits",
+  "description": "Agent skills from Splits",
+  "owner": {
+    "name": "Splits"
+  },
+  "plugins": [
+    {
+      "name": "claims",
+      "source": "./",
+      "description": "Check what a product claims against its code and tests: claim trees, audits, plans, competitor matchups, and PR claim decks"
+    }
+  ]
+}
