@@ -14,9 +14,21 @@ Every leaf gets one grade: `proven` (a test, lint, or type rule enforces it), `p
 
 ## Install
 
-```bash
-git clone https://github.com/0xSplits/claims ~/claims
-mkdir -p ~/.claude/skills && for s in ~/claims/*/; do ln -s "${s%/}" ~/.claude/skills/; done
+In Claude Code:
+
+```
+/plugin install claims --marketplace 0xSplits/claims
 ```
 
-The scripts need only Python 3. Check one with `python3 ~/claims/claim/check.py --self-test`.
+On Claude Code older than 2.1.275, add the marketplace first:
+
+```
+/plugin marketplace add 0xSplits/claims
+/plugin install claims@splits
+```
+
+The skills then run as `/claims:claim`, `/claims:audit-claims`, and so on. Get updates with `/plugin marketplace update splits`.
+
+For other agents, such as Cursor or Codex: `npx skills add 0xSplits/claims`.
+
+The scripts need only Python 3. Check one with `python3 skills/claim/check.py --self-test`.

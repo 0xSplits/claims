@@ -1,0 +1,8 @@
+{
+  "name": "claims",
+  "description": "Check what a product claims against its code and tests: claim trees, audits, plans, competitor matchups, and PR claim decks",
+  "version": "0.1.0",
+  "author": { "name": "Splits" },
+  "repository": "https://github.com/0xSplits/claims",
+  "license": "MIT"
+}
