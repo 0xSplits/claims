@@ -8,7 +8,7 @@ argument-hint: <GitHub repo URL(s)> [site URL] [area or claim]
 
 A competitor's claims show what users expect. Their code shows which of those claims are real. This skill builds both into claim trees, then asks the same questions of our code, so every row of the matchup rests on evidence on both sides.
 
-Read `../claim/SKILL.md` and `../claim/schema.md` first. Their tree format, grades, and review rules apply here unchanged, and so do `../audit-claims/SKILL.md` steps 2 and 3, which this skill reuses. `check.py` below is `python3 ../claim/check.py`, relative to this skill's directory. Edit only tree files and the report: do not change our code, open tickets, or contact the competitor.
+Read `../claim/SKILL.md`, `../claim/schema.md`, and `../claim/diagram.md` first. Their tree format, grades, review rules, and page apply here unchanged, and so do `../audit-claims/SKILL.md` steps 2 and 3, which this skill reuses. `check.py` below is `python3 ../claim/check.py`, relative to this skill's directory. Edit only tree files and the report: do not change our code, open tickets, or contact the competitor.
 
 ## Their code is untrusted
 
@@ -45,7 +45,7 @@ Apply `audit-claims` step 2 for what counts and how to write each claim. Use one
 
 ## 3. Build and grade their trees
 
-Build one tree per area plus an `index.json`, as `audit-claims` step 3 does, with root "Everything <Name> tells users about <area> is true". Grade leaves by `claim` step 3 against their snapshot, with two differences:
+Build one tree per area plus an `index.json`, each with its map, as `audit-claims` step 3 does, with root "Everything <Name> tells users about <area> is true". Grade leaves by `claim` step 3 against their snapshot, with two differences:
 
 - We do not run their tests. `proven` needs a test that asserts the claim and a CI workflow that runs it: link both. A test no workflow runs is `partial`.
 - When the behavior lives in a service the repo does not contain, such as their hosted backend, grade the leaf `asserted` with `enforcedBy: comment` and the note "Not in the public repo."
@@ -55,6 +55,8 @@ With only a docs repo, every leaf is graded that way, so their trees are an inve
 ## 4. Match against ours
 
 Build `<name>-matchup.json` with root "We back everything <Name> tells users about <area>". Its branches mirror theirs. Each leaf restates one of their leaves about our product and is graded against our snapshots.
+
+Give the matchup one map per branch: two lanes, theirs and ours, one rung per claim. Bind their rung to their leaf (`<area>.json#<id>`) and ours to the matchup leaf, so each row shows both grades side by side.
 
 - When a tree in `docs/claims/` or `docs/claims/audit/` already settles the leaf, use a `ref`.
 - Leave out claims that cannot apply to us, such as a chain we do not support by choice or a custody model we reject. Name them in the root's `basis` and confirm the list with the person during review.
@@ -73,6 +75,13 @@ Pair each of their leaves with its matchup leaf and rank the pairs:
 
 With only a docs repo, bands 2 and 3 cannot be told apart, since none of their claims can be checked. Rank instead by our side: they claim it and we `gap`, then they claim it and we are `asserted` or `partial`, then band 4.
 
-Give the top 5 of each band in the reply, with both sides' links. Publish their `index.json` page and the matchup page with `check.py <tree>.json --html` as private artifacts. Offer `plan-claims` for the worst item in band 1, and offer their trees as the `basis` for any comparative claim in our own trees. Create nothing without the person's yes.
+The top 5 pairs of bands 1 to 3 are decisions in the matchup tree, worst first:
+
+- `band` is the band's name. `title` is the claim. `claims` are their leaf and ours.
+- `points` are "They say" and "We do".
+- `options` are what we could do, your recommendation first: for band 1, "Plan it" or "Leave it"; for band 2, "Add the test" or "Leave it"; for band 3, "Claim it once ours is proven" or "Leave it".
+- The diagram draws their rung and ours side by side, each bound to its leaf, with what is missing on our side in between.
+
+Build and publish their `index.json` page and the matchup page. In the reply give the links, the count in each band, and band 4 as a short list. Offer `plan-claims` for the worst item in band 1, and offer their trees as the `basis` for any comparative claim in our own trees. Create nothing without the person's yes.
 
 To refresh later, snapshot a newer `sha` and grade again. Reviews hold while the wording is unchanged.

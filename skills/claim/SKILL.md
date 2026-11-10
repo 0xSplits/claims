@@ -6,9 +6,18 @@ argument-hint: <claim sentence, or tree file / node id to expand>
 
 # Claim
 
-A claim is true when its definition is reviewed and every part of that definition is proven. This skill builds that definition one level at a time and grades what the code can back today. Read `schema.md` for the file format and grades before writing anything.
+A claim is true when its definition is reviewed and every part of that definition is proven. This skill builds that definition one level at a time and grades what the code can back today. Read `schema.md` for the file format and grades, and `diagram.md` for the diagrams, before writing anything.
 
 Trees live in `docs/claims/` of the repo you keep them in, one file per root claim, named for it (`accounting-suite.json`). Edit only tree files: do not change code, commit, or post anywhere.
+
+## The page is where the person decides
+
+A tree is read as its page, not as text in the reply. `check.py <tree>.json --html <tree>.html` builds it: a cover, one slide per open decision, one slide per map, then every claim.
+
+- Every question you put to the person is a decision in the tree file, with a diagram of what it is about. Do not ask them to read a list in the reply.
+- Publish the page as a private artifact when you can (Claude Code: the Artifact tool), and publish the same file again after each change so the link stays the same. Otherwise hand over the file. Do not commit the page.
+- When you ask, give the link and each open decision's title and options in one line, so the person can answer in the chat after looking at the picture.
+- When they answer, record the answer in the tree and delete the decision.
 
 ## 1. Find the node to expand
 
@@ -27,7 +36,13 @@ Write 2 to 7 children for the node. Children come from what the claim means, not
 - Together the children must make the parent true: if every child held, a skeptic would accept the parent.
 - A child that some tree in `docs/claims/` already establishes becomes a `ref`, not a copy.
 
-Put the basis in one or two sentences on the node. Then show the person the parent, the children, and the basis, and ask whether the children cover the claim. Revise until they say yes, then set `reviewed` with their name, today's date, and the digest from `check.py <tree>.json --digest <id>`. After that, the wording is fixed: changing the branch's claim or a child's voids the review, and `check.py` shows the branch as changed since review until the person agrees again. When no person is present, leave `reviewed` out: the branch then caps at `asserted`, which is the honest grade for a definition nobody agreed to.
+Put the basis in one or two sentences on the node. Then ask the person whether the children cover the claim, as a decision:
+
+- `band` is `Definition`, `title` is "Do these parts cover '<claim>'?", and `claims` is the branch.
+- `points` are the claim and the basis. `options` are "They cover it" and "Revise".
+- The diagram draws the branch with every child bound to its step: a lifecycle when the children are states and actions, a fan-out otherwise. A step with no child is how a missing child shows.
+
+Revise until they say yes, then delete the decision and set `reviewed` with their name, today's date, and the digest from `check.py <tree>.json --digest <id>`. After that, the wording is fixed: changing the branch's claim or a child's voids the review, and `check.py` shows the branch as changed since review until the person agrees again. When no person is present, leave `reviewed` out: the branch then caps at `asserted`, which is the honest grade for a definition nobody agreed to.
 
 Expand one level per run.
 
@@ -41,14 +56,20 @@ For each new child that one behavior or one rule can settle, find the evidence. 
 - When the code deliberately does something other than the claim says, grade it `gap` and put what does hold in the note. Do not reword a child to fit the code: propose the new wording to the person and stamp the review again if they agree.
 - When the behavior is in the code but takes effect on a known date (a plan enforcement date, a launch), grade what the code will do and set `liveFrom` to that date.
 
-## 4. Check
+## 4. Draw the map
+
+Keep one map in the tree that draws every leaf, and bind each new child into it. Draw it from what the claim means, as the states a user or a record moves through, not from how the code is laid out. Colors come from the grades, so the map needs no edit when a leaf is graded again.
+
+When one picture cannot hold the tree in 12 nodes, make the first map a fan-out of the top branches and add one map per branch.
+
+## 5. Check
 
 ```bash
 python3 <this skill's directory>/check.py <tree>.json
 ```
 
-Fix every problem rather than loosening the data. The script refuses a `proven` leaf without mechanical evidence, a branch with more than 7 children, a dangling child or ref, a cycle, a node nothing reaches, and a review without a digest.
+Fix every problem rather than loosening the data. The script refuses a `proven` leaf without mechanical evidence, a branch with more than 7 children, a dangling child or ref, a cycle, a node nothing reaches, a review without a digest, a map or decision that names a claim that does not exist, and a diagram with nothing lit. It also names the leaves no map draws.
 
-## 5. Report
+## 6. Report
 
-Give the qualified statement exactly as `check.py` prints it, the grade tally, and the next node to expand. To show the tree, add `--html <tree>.html` to the check and publish that page as a private artifact when you can; do not commit it. Name any `asserted` leaf with a real failure mode. For a leaf a reviewer needs to see drawn, point at the `claim-deck` skill.
+Build and publish the page. In the reply give the link, the grade tally, any open decision, and the next node to expand. The qualified statement is on the page's cover: repeat it in the reply, exactly as `check.py` prints it, only when it has three qualifiers or fewer. Name any `asserted` leaf with a real failure mode. For a pull request, where each claim needs its own code path drawn, point at the `claim-deck` skill.

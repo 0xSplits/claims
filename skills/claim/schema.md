@@ -1,6 +1,6 @@
 # Claim tree JSON
 
-One file per root claim, in `docs/claims/`. `check.py` validates it, computes every node's grade, and prints the qualified root statement.
+One file per root claim, in `docs/claims/`. `check.py` validates it, computes every node's grade, prints the qualified root statement, and with `--html` builds the page.
 
 ```json
 {
@@ -27,7 +27,9 @@ One file per root claim, in `docs/claims/`. `check.py` validates it, computes ev
       "note": "Tables over 100,000 rows time out. No ticket."
     },
     "pricing": { "claim": "We have best-in-class pricing", "ref": "pricing.json" }
-  }
+  },
+  "maps": [ { ...map } ],
+  "decisions": [ { ...decision } ]
 }
 ```
 
@@ -62,3 +64,29 @@ Every node has `claim`: one declarative sentence. Any node may also have `source
 Grades rank `proven` > `partial` > `asserted` > `open` > `gap`. A branch takes its weakest child's grade, capped at `asserted` until it is reviewed and its digest matches. A ref takes the grade of the node it points at.
 
 The qualified statement is the root claim plus everything below it that is not proven: each non-proven leaf, open node, and ref, and each branch that is unreviewed or changed since review.
+
+## The page
+
+`check.py <tree>.json --html <page>.html` builds one page per tree, laid out like a claim deck: a cover with the tally, one slide per open decision, one slide per map, and every claim as an outline. `maps` and `decisions` are optional, and the page is where the person reads the tree and answers questions about it. `diagram.md` has the diagram grammar and how an element is bound to claims.
+
+### Maps
+
+A map is the tree, or one branch of it, drawn as a single picture: `{ "title", "caption"?, "diagram" }`. Each state and step in the diagram is bound to the claims about it, and takes the color of the weakest. Selecting one on the page lists its claims, notes, and links.
+
+A tree's first map should draw every leaf. `check.py` prints how many leaves the maps draw and names the ones left out. Binding a branch draws every leaf under it.
+
+### Decisions
+
+A decision is one question the person has to answer, as one slide:
+
+| Field | Required | Meaning |
+|---|---|---|
+| `title` | yes | The question or finding, in one sentence |
+| `claims` | yes | The nodes it is about. A name is an id in this tree or `other.json#id`. |
+| `band` | no | Short tag for its kind or rank: `False about money`, `Assumption`, `Definition` |
+| `points` | no | `[{ "label", "text" }]`, at most 3: the facts needed to decide, such as "We say" and "The code does" |
+| `options` | yes | `[{ "label", "detail"? }]`, 2 to 4, your recommendation first. `detail` is what choosing it costs or changes, in one sentence. |
+| `diagram` | yes | The states the question is about. Draw each option worth drawing as a way out. |
+| `caption` | no | One line under the diagram |
+
+`decisions` holds open questions only. When the person answers one, record the answer where it belongs (a `reviewed` stamp, a leaf's `note`, a reworded claim, a ticket) and delete the decision.

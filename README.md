@@ -4,13 +4,15 @@ Agent skills for Claude Code that treat what a product promises as a set of clai
 
 | Skill | What it does |
 |---|---|
-| `claim` | Break a claim into a reviewed tree of sub-claims, grade each leaf against the code, report the gaps |
+| `claim` | Break a claim into a reviewed tree of sub-claims, grade each leaf against the code, draw it as a page |
 | `audit-claims` | Collect what the website, docs, and app tell users into claim trees, grade them, rank what is false or mislabeled |
 | `plan-claims` | Turn a feature request into a launch claim, a reviewed claim tree, and a plan with one task per gap |
 | `investigate-claims` | Map a competitor's claims against their code, then grade the same claims against yours |
 | `claim-deck` | Build a one-slide-per-claim review page for a pull request, with evidence grades and diagrams |
 
 Every leaf gets one grade: `proven` (a test, lint, or type rule enforces it), `partial`, `asserted` (only a comment or a one-off check says so), or `gap`. A branch takes its weakest child's grade, and stays capped at `asserted` until a person agrees its children cover it. `claim/schema.md` has the format.
+
+Every skill ends in a page you scroll one slide at a time. Each open decision is a slide with a diagram of what it is about and the options, recommended first. Each map draws the claims as one picture, colored by grade. `claim/diagram.md` has the diagram grammar.
 
 ## Install
 

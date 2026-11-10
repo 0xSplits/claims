@@ -8,7 +8,7 @@ argument-hint: <feature request, or a tree in docs/claims to continue planning>
 
 A feature is done when we can say what it does and prove it. This skill starts from that statement and works down to tasks. Proven leaves are work that already exists. Gaps are the plan.
 
-Read `../claim/SKILL.md` and `../claim/schema.md` first. Their tree format, grades, and review rules apply here unchanged. `check.py` below is `python3 ../claim/check.py`, relative to this skill's directory. Write only the tree and the plan doc. Do not change code, and do not create tickets without the person's yes.
+Read `../claim/SKILL.md`, `../claim/schema.md`, and `../claim/diagram.md` first. Their tree format, grades, review rules, and page apply here unchanged. `check.py` below is `python3 ../claim/check.py`, relative to this skill's directory. Write only the tree and the plan doc. Do not change code, and do not create tickets without the person's yes.
 
 ## 1. Write the launch claim
 
@@ -19,6 +19,8 @@ The tree goes in `docs/claims/<feature>.json`. If the argument names an existing
 ## 2. Decompose to leaves
 
 Break the claim down by `claim` step 2, with the same review gate and digest. Unlike `claim`, keep going in this session until every leaf is one behavior on one surface. Ask about one level at a time.
+
+After the first level, draw the feature's map: the states the thing moves through and the actions between them, each bound to its claims. Each level's review is a `Definition` decision on the same page, as `claim` step 2 describes, so the person watches one picture fill in. Bind every new leaf into the map.
 
 - The basis is the request, any spec or PRD it names, and the alternatives when the claim is comparative.
 - Reuse what other trees establish through a `ref`.
@@ -32,9 +34,18 @@ Grade every leaf by `claim` step 3, against a snapshot of each repo's default br
 - `partial` or `asserted`: exists in part. The task finishes it or adds the missing test.
 - `gap`: to build.
 
+Publish the page again. The map now shows what exists in green and what the plan has to build in red.
+
 ## 4. Settle assumptions
 
-List every decision the request, spec, and code leave open: numbers and limits, who may do it, which plans and surfaces, what happens on failure, how it interacts with existing features. Ask the person at most 4 at a time, each with your recommended answer first. Each answer does one of three things:
+List every decision the request, spec, and code leave open: numbers and limits, who may do it, which plans and surfaces, what happens on failure, how it interacts with existing features. Each one is a decision, at most 4 open at a time:
+
+- `band` is `Assumption`. `title` is the question. `claims` are the leaves that rest on it.
+- `points` are "Open question" and "Why it matters".
+- `options` are the possible answers, your recommendation first, each with what it does to scope.
+- The diagram is the part of the map the answer changes, with each answer drawn as a way out.
+
+Publish and ask. Delete each decision when it is answered. Each answer does one of three things:
 
 - **Keep:** the leaf stays in scope. Put the decision in its `note`.
 - **Cut:** the leaf stays as a `gap` whose note starts "Out of scope:" with the reason. It then shows in the qualified statement, which becomes the honest launch claim ("…, except: period reopening").
@@ -56,8 +67,9 @@ Run `check.py` on the tree. Then write `docs/plans/<YYYY-MM-DD>-feat-<feature>-p
    - what it depends on
 5. **Order:** the tasks in dependency order. Mark the ones that can run in parallel.
 
-Publish the tree page (`check.py <tree>.json --html`) as a private artifact. Report:
+Add a second map, "Order": one node per task, bound to its leaves, with an edge for each "depends on" and parallel tasks on the same row. It turns green as tasks land. Build and publish the page, and put its link at the top of the plan doc. Report:
 
+- the page link
 - the launch claim
 - the counts of tasks, cut leaves, and leaves already proven
 - the first task to start
