@@ -26,8 +26,10 @@ Node `badge`: `✓` tested, `!` stated risk, `×` known gap.
 
 Layout rules the renderer assumes:
 - Edges to a lower row leave the bottom of the source and enter the top of the target.
-- Edges on the same row run sideways, so do not put a third node between the two.
+- Edges on the same row run sideways, and edges straight down a column run vertically, so do not put a node between an edge's two ends.
+- Edges to a lower row in another column curve from the bottom of the source to the top of the target.
 - Edges to a higher row loop around the right side.
+- Groups that no edge joins are fine, such as two lifecycles on separate rows.
 - Two nodes may not share a `(col, row)` cell.
 
 ## Binding to claims
@@ -38,7 +40,7 @@ In a claim tree, a node or edge may name the claims it stands for:
 { "from": "open", "to": "closed", "label": "close", "claims": ["close-freezes", "close-locks"] }
 ```
 
-A name is a node id in the same tree, or `other.json#id` for a node in another tree. A bound element ignores its own `status` and takes the color of its weakest claim: proven green, partial amber, asserted dotted purple, gap red, open grey. Bind wherever you can and never color a claim by hand: a bound picture cannot disagree with the tree, and it recolors itself when the leaves are graded again. Use `status` only for things that are not claims, such as an option nobody has taken yet.
+A name is a node id in the same tree, or `other.json#id` for a node in another tree. A bound element ignores its own `status` and takes the color of its weakest claim: proven green, partial amber, asserted dotted purple, gap red, open grey. Bind wherever you can and never color a claim by hand: a bound picture cannot disagree with the tree, and it recolors itself when the leaves are graded again. An edge and the nodes at its ends may each be bound: bind a claim to the edge when it is about the action, and to the node when it is about the state. Use `status` only for things that are not claims, such as an option nobody has taken yet.
 
 Claim decks have no tree, so their diagrams use `status` alone.
 
@@ -48,7 +50,7 @@ Claim decks have no tree, so their diagrams use `status` alone.
 |---|---|
 | A whole feature or branch (a map) | Lifecycle: one `terminal` per state, one edge per action, each bound to the claims about it. Side effects hang below the state they happen in. |
 | A list with no lifecycle, such as areas or plan tiers (a map) | Fan-out: the root on the left, one bound node per part |
-| A decision between options | The mismatch on the top row, bound to the claims in question. Below it, one `terminal` per option worth drawing, reached by an `added` edge for the recommended one and a `same` edge for the others. |
+| A decision between options | The mismatch on the top row, bound to the claims in question. Below it, one `terminal` per option worth drawing, reached by an `added` edge for the recommended one and a `same` edge for the others. Each option's edge starts at the state it would change. |
 | A definition to review | The branch as a lifecycle or fan-out with every child bound, so a missing child shows as a step with no claim |
 | Two products, or two things that must agree | Two lanes, one rung per claim, each rung bound to its own side's leaf, a `same answer` edge between them |
 | Task order | One node per task bound to its leaves, an edge for each "depends on", parallel tasks on the same row |

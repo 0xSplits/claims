@@ -40,9 +40,9 @@ Put the basis in one or two sentences on the node. Then ask the person whether t
 
 - `band` is `Definition`, `title` is "Do these parts cover '<claim>'?", and `claims` is the branch.
 - `points` are the claim and the basis. `options` are "They cover it" and "Revise".
-- The diagram draws the branch with every child bound to its step: a lifecycle when the children are states and actions, a fan-out otherwise. A step with no child is how a missing child shows.
+- The diagram draws the branch with every child bound to its step: a lifecycle when the children are states and actions, a fan-out otherwise. A step with no child is how a missing child shows. When the tree's map already is that picture, set `map` to its title instead.
 
-Revise until they say yes, then delete the decision and set `reviewed` with their name, today's date, and the digest from `check.py <tree>.json --digest <id>`. After that, the wording is fixed: changing the branch's claim or a child's voids the review, and `check.py` shows the branch as changed since review until the person agrees again. When no person is present, leave `reviewed` out: the branch then caps at `asserted`, which is the honest grade for a definition nobody agreed to.
+Revise until they say yes, then delete the decision and set `reviewed` with their name, today's date, and the digest from `check.py <tree>.json --digest <id>`. After that, the wording is fixed: changing the branch's claim or a child's voids the review, and `check.py` shows the branch as changed since review until the person agrees again. When no person is present, write no decision and leave `reviewed` out: the branch then caps at `asserted`, which is the honest grade for a definition nobody agreed to.
 
 Expand one level per run.
 
@@ -60,7 +60,7 @@ For each new child that one behavior or one rule can settle, find the evidence. 
 
 Keep one map in the tree that draws every leaf, and bind each new child into it. Draw it from what the claim means, as the states a user or a record moves through, not from how the code is laid out. Colors come from the grades, so the map needs no edit when a leaf is graded again.
 
-When one picture cannot hold the tree in 12 nodes, make the first map a fan-out of the top branches and add one map per branch.
+When the tree has more leaves than 12 nodes can hold, bind a whole branch to the step it is about: the step then shows the branch's grade and lists its leaves. Add a second map for a branch only when its own steps matter to a decision.
 
 ## 5. Check
 
