@@ -51,9 +51,11 @@ Every node has `claim`: one declarative sentence. Any node may also have `source
 - **proven**: a test asserts the claim, or a lint or type rule makes breaking it impossible. Needs `enforcedBy` of `test`, `lint`, or `type` and at least one `evidence` link.
 - **partial**: holds for some cases. `note` names the rest.
 - **asserted**: the code reads as correct, and a comment, doc, or one-off agent or human check says so. Nothing re-checks it on change.
-- **gap**: does not hold. `note` names the ticket or says "No ticket."
+- **gap**: does not hold. `note` names the ticket or says "No ticket." A gap needs no `evidence`. When the thing is missing, the note says where you searched.
 
-`enforcedBy` is one of `test`, `lint`, `type`, `agent`, `review`, `comment`, and a `gap` leaves it out. Only the first three are mechanical, so only they can back `proven`.
+A claim that something is absent ("we do not sync") has no assertion to link, so it is `asserted`, with a note naming the search that found nothing.
+
+`enforcedBy` is one of `test`, `lint`, `type`, `agent`, `review`, `comment`, and a `gap` leaves it out. Only the first three are mechanical, so only they can back `proven`. `agent` means an agent read the code once, `review` means a person did, and `comment` means only a comment or doc says so.
 
 `liveFrom` is a `YYYY-MM-DD` date for a leaf whose behavior is in the code but not in effect yet, such as a plan enforcement date. Before it the leaf counts as a gap, qualified "live from" that date. From it the leaf's own grade applies, with no edit.
 
@@ -73,7 +75,7 @@ The qualified statement is the root claim plus everything below it that is not p
 
 A map is the tree, or one branch of it, drawn as a single picture: `{ "title", "caption"?, "diagram" }`. Each state and step in the diagram is bound to the claims about it, and takes the color of the weakest. Selecting one on the page lists its claims, notes, and links.
 
-A tree's first map should draw every leaf. `check.py` prints how many leaves the maps draw and names the ones left out. Binding a branch draws every leaf under it.
+Between them, a tree's maps should draw every leaf. `check.py` prints how many leaves the maps draw and names the ones left out. Binding a branch draws every leaf under it, so a large tree still fits in one picture.
 
 ### Decisions
 
@@ -86,7 +88,8 @@ A decision is one question the person has to answer, as one slide:
 | `band` | no | Short tag for its kind or rank: `False about money`, `Assumption`, `Definition` |
 | `points` | no | `[{ "label", "text" }]`, at most 3: the facts needed to decide, such as "We say" and "The code does" |
 | `options` | yes | `[{ "label", "detail"? }]`, 2 to 4, your recommendation first. `detail` is what choosing it costs or changes, in one sentence. |
-| `diagram` | yes | The states the question is about. Draw each option worth drawing as a way out. |
+| `diagram` | yes, or `map` | The states the question is about. Draw each option worth drawing as a way out. |
+| `map` | instead of `diagram` | The title of one of this tree's maps, when the question is about the whole picture, such as a definition to review |
 | `caption` | no | One line under the diagram |
 
 `decisions` holds open questions only. When the person answers one, record the answer where it belongs (a `reviewed` stamp, a leaf's `note`, a reworded claim, a ticket) and delete the decision.
