@@ -4,7 +4,7 @@
 Usage: python3 build.py claims.json [-o deck.html]
 
 Validates the JSON against the grammar in schema.md, then inlines the
-renderer, styles, and data into template.html. No dependencies beyond the
+renderer and styles from ../claim and the data into template.html. No dependencies beyond the
 standard library. Exit code 1 and a list of problems on invalid input.
 """
 import argparse
@@ -13,12 +13,10 @@ import pathlib
 import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
+CLAIM = HERE.parent / "claim"
 GRADES = {"proven", "partial", "asserted", "gap", "deviation"}
-NODE_TYPES = {"process", "decision", "terminal", "note"}
-NODE_STATUS = {"same", "added", "changed", "removed", "gap", "deferred"}
-EDGE_STATUS = {"same", "added", "removed", "covered", "uncovered", "async", "gap", "deferred"}
-BADGES = {"✓", "!", "×"}
-MAX_NODES = 12
+sys.path.insert(0, str(CLAIM))
+from check import validate_diagram  # noqa: E402
 
 
 def validate(deck):
@@ -51,55 +49,14 @@ def validate(deck):
         check_links(claim.get("links"), where)
         check_links(claim.get("proofLinks"), where)
 
-        diagram = claim.get("diagram")
-        if not diagram or not diagram.get("nodes"):
-            problems.append(f"{where}: needs a diagram with nodes")
-            continue
-        nodes, edges = diagram["nodes"], diagram.get("edges", [])
-        ids = [n.get("id") for n in nodes]
-        if len(set(ids)) != len(ids):
-            problems.append(f"{where}: duplicate node ids")
-        if len(nodes) > MAX_NODES:
-            problems.append(f"{where}: {len(nodes)} nodes; keep a claim's diagram to {MAX_NODES} or fewer")
-        cells = {}
-        for n in nodes:
-            for key in ("id", "label", "col", "row"):
-                if key not in n:
-                    problems.append(f"{where}: node needs '{key}'")
-            if n.get("type", "process") not in NODE_TYPES:
-                problems.append(f"{where}: node {n.get('id')} type must be one of {sorted(NODE_TYPES)}")
-            if n.get("status", "same") not in NODE_STATUS:
-                problems.append(f"{where}: node {n.get('id')} status must be one of {sorted(NODE_STATUS)}")
-            if n.get("badge") and n["badge"] not in BADGES:
-                problems.append(f"{where}: node {n.get('id')} badge must be one of {sorted(BADGES)}")
-            cell = (n.get("col"), n.get("row"))
-            if cell in cells:
-                problems.append(f"{where}: nodes {cells[cell]} and {n.get('id')} share grid cell {cell}")
-            cells[cell] = n.get("id")
-        idset = set(ids)
-        for e in edges:
-            if e.get("from") not in idset:
-                problems.append(f"{where}: edge from unknown node {e.get('from')}")
-            if e.get("to") not in idset:
-                problems.append(f"{where}: edge to unknown node {e.get('to')}")
-            if e.get("status", "same") not in EDGE_STATUS:
-                problems.append(f"{where}: edge {e.get('from')}→{e.get('to')} status must be one of {sorted(EDGE_STATUS)}")
-        lit = [n for n in nodes if n.get("status", "same") != "same" and not n.get("dim")] + [e for e in edges if e.get("status", "same") != "same" and not e.get("dim")]
-        if not lit:
-            problems.append(f"{where}: nothing in the diagram is lit; give the claim's path a status other than 'same'")
-        for lane in diagram.get("lanes", []):
-            if "label" not in lane or "cols" not in lane or len(lane["cols"]) != 2:
-                problems.append(f"{where}: lane needs 'label' and 'cols': [first, last]")
-        for region in diagram.get("regions", []):
-            if "label" not in region or "cols" not in region or "rows" not in region:
-                problems.append(f"{where}: region needs 'label', 'cols', and 'rows'")
+        problems += validate_diagram(claim.get("diagram"), where)
     return problems
 
 
 def build(deck):
     template = (HERE / "template.html").read_text()
-    css = (HERE / "flow.css").read_text()
-    js = (HERE / "flow.js").read_text()
+    css = (CLAIM / "flow.css").read_text()
+    js = (CLAIM / "flow.js").read_text()
     # </script> inside a JSON string would end the script block early.
     data = json.dumps(deck, ensure_ascii=False).replace("</", "<\\/")
     return template.replace("{{TITLE}}", deck["title"]).replace("{{CSS}}", css).replace("{{JS}}", js).replace("{{DATA}}", data)

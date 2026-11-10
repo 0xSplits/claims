@@ -31,7 +31,7 @@ One file per PR. `build.py` validates it and produces the page.
 | `proofLinks` | for `proven` | Links into the test file |
 | `risk` | no | What is not covered, or the ticket this is handed to |
 | `caption` | no | One line under the diagram |
-| `diagram` | yes | See below |
+| `diagram` | yes | See `../claim/diagram.md` |
 
 ### Grades
 
@@ -43,43 +43,4 @@ One file per PR. `build.py` validates it and produces the page.
 
 ## Diagram
 
-A small flowchart on a grid. Keep it to 4 to 9 nodes, 12 at most. The claim's path is lit (any status but `same`); everything else is `same` or `dim: true`.
-
-```json
-{
-  "colW": 215, "rowH": 84, "nodeW": 180, "nodeH": 50,
-  "lanes": [{ "label": "Caller A", "cols": [0, 0] }],
-  "regions": [{ "label": "one transaction", "cols": [0, 0], "rows": [1, 4], "stroke": "var(--warn)" }],
-  "nodes": [{ "id": "a", "label": "line one\nline two", "col": 0, "row": 0, "type": "decision", "status": "added", "dim": false, "badge": "✓" }],
-  "edges": [{ "from": "a", "to": "b", "label": "yes ✓", "status": "covered", "dim": false }]
-}
-```
-
-Node `type`: `process` (default), `decision` (diamond), `terminal` (pill; use for states and endpoints), `note` (dashed, for annotations).
-
-Node `status`: `same` (grey), `added` (teal), `changed` (amber), `removed` (red, faded), `gap` (red), `deferred` (amber).
-
-Edge `status`: `same` (grey), `added` (teal), `covered` (green, a test takes this edge), `uncovered` (red dashed, no test takes it), `gap` (red dashed), `deferred` (amber), `async` (dotted purple, a queue or worker hop), `removed` (red dashed).
-
-Node `badge`: `✓` tested, `!` stated risk, `×` known gap.
-
-`lanes` turns the grid into swimlanes: each lane spans a column range and gets a header. `regions` draws a dashed box around a block of cells, for a transaction or a "must agree" pair.
-
-Layout rules the renderer assumes:
-- Edges to a lower row leave the bottom of the source and enter the top of the target.
-- Edges on the same row run sideways.
-- Edges to a higher row loop around the right side.
-- Two nodes may not share a `(col, row)` cell.
-
-### Picking a shape
-
-| Claim is about | Draw |
-|---|---|
-| An invariant that survives change | Lifecycle: `terminal` states, the preserving transition lit, the mutations as a `note` |
-| A predicate or branch | Decision flow: the `decision` node and the lit branch, the other branch `dim` |
-| Two things that must agree | Two ladders side by side, the new rung lit in both, a `same answer` edge between them |
-| Atomicity or ordering | Swimlanes with a `region` around the transaction and an `async` edge for the queue hop |
-| Concurrency | Swimlanes, one per caller, the lock as the first node |
-| Reach or inheritance | Fan-out from the changed node; untested consumers get `uncovered` edges |
-| A known gap | The wrong transition in `gap` red; the intended one `dim` with `uncovered` |
-| Performance | Fan-out of per-row costs; the missing measurement as a `gap` terminal |
+The grammar, the layout rules, and the table for picking a shape are in `../claim/diagram.md`. A deck has no claim tree, so its diagrams are colored with `status`, not bound to claims. The claim's path is lit (any status but `same`); everything else is `same` or `dim: true`.

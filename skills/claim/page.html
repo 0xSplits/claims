@@ -1,0 +1,155 @@
+<title>{{TITLE}}</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: the claim deck's. Full-height slides with vertical scroll-snap and a rail of dots. Cover, one slide per open decision (words left, diagram right), one slide per map with the selected step's claims under it, then every claim as an outline. */
+{{CSS}}
+:root { --open: #8a938f; --open-soft: #eceeec; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --open: #7d8783; --open-soft: #262b2a; } }
+:root[data-theme="dark"] { --open: #7d8783; --open-soft: #262b2a; }
+html, body { height: 100%; }
+body { padding-block: 0; }
+.deck { height: 100%; overflow-y: auto; scroll-snap-type: y mandatory; scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { .deck { scroll-behavior: auto; } }
+.slide { min-height: 100%; scroll-snap-align: start; display: grid; align-content: center; padding-block: 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); box-sizing: border-box; }
+.card { width: min(1180px, 100%); margin-inline: auto; display: grid; grid-template-columns: minmax(300px, 5fr) minmax(0, 7fr); gap: 22px; align-items: start; }
+.card.one { grid-template-columns: 1fr; gap: 18px; }
+.text { display: grid; gap: 12px; min-width: 0; }
+.kicker { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+.kicker .n { font-variant-numeric: tabular-nums; }
+.chip { font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.proven { --g: var(--ok); --g-soft: var(--ok-soft); } .partial { --g: var(--warn); --g-soft: var(--warn-soft); } .asserted { --g: var(--prev); --g-soft: var(--prev-soft); }
+.gap { --g: var(--bad); --g-soft: var(--bad-soft); } .open { --g: var(--open); --g-soft: var(--open-soft); } .rec { --g: var(--accent); --g-soft: var(--accent-soft); }
+.chip { background: var(--g-soft); color: var(--g); }
+.claim-title { font-size: clamp(19px, 2.2vw, 25px); font-weight: 600; line-height: 1.25; margin: 0; text-wrap: balance; }
+.block { display: grid; gap: 4px; }
+.block h4 { margin: 0; font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.block p { margin: 0; font-size: 13.5px; max-width: 60ch; }
+.block.last { border-left: 3px solid var(--g); padding-left: 10px; }
+.opt { display: grid; gap: 2px; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; font-size: 13.5px; background: var(--panel); }
+.opt.first { border-color: var(--accent); }
+.opt b { font-weight: 600; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.opt .d { color: var(--muted); }
+.ids { font-family: var(--mono); font-size: 11.5px; color: var(--muted); overflow-wrap: anywhere; }
+.fig { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; min-width: 0; }
+.fig .cap { font-size: 12px; color: var(--muted); padding: 2px 6px 6px; }
+.rail { position: fixed; left: max(8px, env(safe-area-inset-left, 0px)); top: 50%; transform: translateY(-50%); display: grid; gap: 6px; z-index: 5; }
+.rail a { width: 9px; height: 9px; border-radius: 50%; background: var(--g, var(--muted)); display: block; border: 2px solid transparent; box-sizing: border-box; }
+.rail a.on { transform: scale(1.5); border-color: var(--fg); }
+.rail a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hint { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); font-size: 12px; color: var(--muted); background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; z-index: 5; font-variant-numeric: tabular-nums; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+.stats button { font: inherit; color: inherit; text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; cursor: pointer; }
+.stats button b { display: block; font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--g); }
+.stats button span { font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px; }
+.toc a { display: flex; gap: 8px; align-items: baseline; font-size: 13px; color: var(--fg); text-decoration: none; padding: 6px 8px; border-radius: 6px; border: 1px solid transparent; }
+.toc a:hover { border-color: var(--line); background: var(--panel); }
+.toc a i { width: 8px; height: 8px; border-radius: 50%; flex: none; display: inline-block; background: var(--g, var(--muted)); position: relative; top: -1px; }
+.toc a .n { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.lead { font-size: 16px; color: var(--muted); margin: 0; max-width: 78ch; }
+details.statement { font-size: 13px; color: var(--muted); max-width: 90ch; }
+details.statement summary { cursor: pointer; }
+.claims { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.claims li { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 10px; align-items: baseline; font-size: 13.5px; }
+.note { color: var(--muted); font-size: 12.5px; }
+.links a { font-family: var(--mono); font-size: 11.5px; text-decoration: none; border-bottom: 1px dotted var(--accent); margin-right: 10px; }
+.outline { font-size: 13.5px; display: grid; gap: 6px; }
+.outline details { display: grid; gap: 6px; }
+.outline summary { cursor: pointer; font-weight: 500; }
+.outline .kids { display: grid; gap: 6px; padding-left: 18px; border-left: 1px solid var(--line); margin: 6px 0 2px 5px; }
+.outline .leaf { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 10px; align-items: baseline; }
+.outline .chip { margin-right: 6px; }
+@media (max-width: 900px) { .card { grid-template-columns: 1fr; } .rail { display: none; } }
+</style>
+
+<nav class="rail" id="rail" aria-label="Slides"></nav>
+<div class="hint" id="hint"></div>
+<main class="deck" id="deck"></main>
+
+<script>
+{{JS}}
+</script>
+<script>
+(() => {
+  const PAGE = {{DATA}};
+  const D = PAGE.decisions, M = PAGE.maps, RANK = ['gap', 'open', 'asserted', 'partial', 'proven'];
+  // A bound element takes the status that draws its grade.
+  const STATUS = { proven: 'covered', partial: 'deferred', asserted: 'async', gap: 'gap', open: 'same' };
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const chip = (g) => `<span class="chip ${g}">${g}</span>`;
+  const byGrade = (cs) => [...cs].sort((a, b) => RANK.indexOf(a.grade) - RANK.indexOf(b.grade));
+  const links = (c) => { const ls = [...(c.source || []), ...(c.evidence || [])]; return ls.length ? `<div class="links">${ls.map((l) => `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a>`).join('')}</div>` : ''; };
+  const graded = (el) => (el.grade ? { ...el, status: STATUS[el.grade] } : el);
+  const draw = (svg, d, onSelect) => Flow.render(svg, { nodes: d.nodes.map(graded), edges: (d.edges || []).map(graded), lanes: d.lanes || [], regions: d.regions || [], laneTop: d.lanes?.length ? 34 : 0, colW: d.colW || 215, rowH: d.rowH || 92, nodeW: d.nodeW || 180, nodeH: d.nodeH || 50, onSelect });
+  const deck = document.getElementById('deck'), rail = document.getElementById('rail'), hint = document.getElementById('hint');
+  const slides = [];
+  const slide = (id, name, tone, html) => { const s = document.createElement('section'); s.className = 'slide'; s.id = id; s.innerHTML = html; deck.appendChild(s); slides.push({ el: s, name, tone }); };
+  const leaves = Object.values(PAGE.tally).reduce((a, b) => a + b, 0);
+  const count = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+  const lead = [D.length && 'Open decisions come first, one per slide, each with a diagram of what the code can reach.', M.length && 'Each map draws the claims as one picture, colored by grade.', 'The last slide lists every claim. Arrow keys or scroll.'].filter(Boolean).join(' ');
+  slide('cover', 'overview', '', `<div class="card one"><div class="text">
+      <div class="kicker"><span>Claim tree</span><span>·</span><span>${count(leaves, 'claim')}</span>${D.length ? `<span>·</span><span>${count(D.length, 'open decision')}</span>` : ''}</div>
+      <h1 class="claim-title" style="font-size:clamp(24px,3vw,34px)">${esc(PAGE.root)}</h1>
+      <p class="lead">${lead}</p>
+      <details class="statement"><summary>The claim, qualified by everything not proven</summary><p>${esc(PAGE.statement)}</p></details></div>
+    <div class="stats">${Object.entries(PAGE.tally).map(([g, n]) => `<button class="${g}" data-jump="all"><b>${n}</b><span>${g}</span></button>`).join('')}</div>
+    <div class="toc">${D.map((d, i) => `<a href="#d${i + 1}" class="${byGrade(d.claims)[0].grade}"><i></i><span class="n">${pad2(i + 1)}</span><span>${esc(d.title)}</span></a>`).join('')}${M.map((m, i) => `<a href="#m${i + 1}" class="rec"><i></i><span class="n">map</span><span>${esc(m.title)}</span></a>`).join('')}<a href="#all"><i></i><span class="n">all</span><span>Every claim</span></a></div></div>`);
+
+  D.forEach((d, i) => {
+    const worst = byGrade(d.claims)[0].grade, points = d.points || [];
+    slide('d' + (i + 1), `${i + 1} / ${D.length}${d.band ? ' · ' + d.band : ''}`, worst, `<div class="card"><div class="text ${worst}">
+      <div class="kicker"><span class="n">${pad2(i + 1)} / ${D.length}</span>${d.band ? `<span class="chip">${esc(d.band)}</span>` : ''}</div>
+      <h2 class="claim-title">${esc(d.title)}</h2>
+      ${points.map((p, j) => `<div class="block ${j && j === points.length - 1 ? 'last' : ''}"><h4>${esc(p.label)}</h4><p>${esc(p.text)}</p></div>`).join('')}
+      <div class="block"><h4>Options</h4>${d.options.map((o, j) => `<div class="opt ${j ? '' : 'first'}"><b>${esc(o.label)}${j ? '' : '<span class="chip rec">recommended</span>'}</b>${o.detail ? `<span class="d">${esc(o.detail)}</span>` : ''}</div>`).join('')}</div>
+      <div class="ids">${d.claims.map((c) => `${esc(c.id)} (${c.grade})`).join(' · ')}</div>
+    </div><div class="fig"><div class="diagram"><svg id="dfig${i + 1}" role="img" aria-label="${esc(d.caption || d.title)}"></svg></div>${d.caption ? `<div class="cap">${esc(d.caption)}</div>` : ''}</div></div>`);
+  });
+
+  M.forEach((m, i) => slide('m' + (i + 1), 'map' + (M.length > 1 ? ` ${i + 1} / ${M.length}` : ''), 'rec', `<div class="card one"><div class="text">
+      <div class="kicker"><span>Map</span></div>
+      <h2 class="claim-title">${esc(m.title)}</h2>
+      <div class="legend"><span><i style="--c:var(--ok)"></i>proven</span><span><i style="--c:var(--warn)"></i>partial</span><span><i class="dash" style="--c:var(--prev)"></i>asserted</span><span><i class="dash" style="--c:var(--bad)"></i>gap</span><span><i style="--c:var(--muted)"></i>not graded</span></div></div>
+    <div class="fig"><div class="diagram"><svg id="mfig${i + 1}" role="img" aria-label="${esc(m.title)}"></svg></div><div class="cap">${esc(m.caption || 'Each step takes the color of its weakest claim. Select one to see its claims.')}</div></div>
+    <div class="detail" id="mdetail${i + 1}" aria-live="polite"></div></div>`));
+
+  const outline = (n) => (n.children?.length
+    ? `<details ${n.collapsed ? '' : 'open'}><summary>${chip(n.grade)}${esc(n.name)}${n.review && n.review !== 'reviewed' ? ` <span class="note">(definition ${esc(n.review)})</span>` : ''}</summary><div class="kids">${n.basis ? `<div class="note">Basis: ${esc(n.basis)}</div>` : ''}${n.children.map(outline).join('')}</div></details>`
+    : `<div class="leaf"><span>${chip(n.grade)}</span><div>${esc(n.name)}${n.liveFrom ? ` <span class="note">(live from ${esc(n.liveFrom)})</span>` : ''}${n.note ? `<div class="note">${esc(n.note)}</div>` : ''}${links(n)}</div></div>`);
+  slide('all', 'every claim', '', `<div class="card one"><div class="text"><div class="kicker"><span>Every claim</span><span>·</span><span>${count(leaves, 'claim')}</span></div></div><div class="outline">${outline(PAGE.tree)}</div></div>`);
+
+  D.forEach((d, i) => draw(document.getElementById('dfig' + (i + 1)), d.diagram));
+  M.forEach((m, i) => {
+    const show = (el) => {
+      const name = el.kind === 'edge' ? (el.label || `${el.from} to ${el.to}`) : el.label.replace(/\n/g, ' ');
+      document.getElementById('mdetail' + (i + 1)).innerHTML = `<h3>${esc(name)} ${el.grade ? chip(el.grade) : ''}</h3>` + (el.claims?.length
+        ? `<ul class="claims">${byGrade(el.claims).map((c) => `<li><span>${chip(c.grade)}</span><div>${esc(c.claim)}${c.note ? `<div class="note">${esc(c.note)}</div>` : ''}${links(c)}</div></li>`).join('')}</ul>`
+        : '<p>No claims are bound to this step.</p>');
+    };
+    draw(document.getElementById('mfig' + (i + 1)), m.diagram, show);
+    const first = byGrade([...(m.diagram.edges || []).map((e) => ({ kind: 'edge', ...e })), ...m.diagram.nodes.map((n) => ({ kind: 'node', ...n }))].filter((e) => e.grade))[0];
+    if (first) show(first);
+  });
+
+  slides.forEach((s) => { const a = document.createElement('a'); a.href = '#' + s.el.id; a.className = s.tone; a.setAttribute('aria-label', s.name); rail.appendChild(a); });
+  const go = (id) => document.getElementById(id)?.scrollIntoView();
+  document.querySelectorAll('.rail a, .toc a').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); go(a.getAttribute('href').slice(1)); }));
+  deck.querySelectorAll('[data-jump]').forEach((b) => b.addEventListener('click', () => go(b.dataset.jump)));
+
+  const dots = [...rail.children]; let current = 0;
+  const setCurrent = (i) => { current = i; dots.forEach((d, j) => d.classList.toggle('on', j === i)); hint.textContent = slides[i].name; };
+  // Watches the middle of the screen, since a map or the outline can be taller than the screen.
+  const io = new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) setCurrent(slides.findIndex((s) => s.el === e.target)); }), { root: deck, rootMargin: '-45% 0px -45% 0px' });
+  slides.forEach((s) => io.observe(s.el));
+  document.addEventListener('keydown', (e) => {
+    if (['ArrowDown', 'ArrowRight', 'PageDown'].includes(e.key)) { e.preventDefault(); slides[Math.min(current + 1, slides.length - 1)].el.scrollIntoView(); }
+    if (['ArrowUp', 'ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); slides[Math.max(current - 1, 0)].el.scrollIntoView(); }
+    if (e.key === 'Home') { e.preventDefault(); slides[0].el.scrollIntoView(); }
+  });
+  go(location.hash.slice(1));
+  setCurrent(0);
+})();
+</script>

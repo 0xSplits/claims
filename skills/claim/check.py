@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """Check a claim tree: validate it, grade every node, print the qualified root claim.
 
-Usage: python3 check.py tree.json [--html tree.html]
+Usage: python3 check.py tree.json [--html page.html]
        python3 check.py tree.json --digest NODE
        python3 check.py --self-test
 
-The grammar and rollup rules are in schema.md. No dependencies beyond the
+The grammar and rollup rules are in schema.md, and diagrams are in diagram.md. No dependencies beyond the
 standard library. Exit code 1 and a list of problems on invalid input.
 """
 import argparse
 import collections
+import copy
 import datetime
 import hashlib
 import json
@@ -24,6 +25,11 @@ ENFORCERS = {"test", "lint", "type", "agent", "review", "comment"}
 MECHANICAL = {"test", "lint", "type"}
 KINDS = ("children", "grade", "ref")
 MAX_CHILDREN = 7
+NODE_TYPES = {"process", "decision", "terminal", "note"}
+NODE_STATUS = {"same", "added", "changed", "removed", "gap", "deferred", "covered", "async"}
+EDGE_STATUS = {"same", "added", "removed", "covered", "uncovered", "async", "gap", "deferred"}
+BADGES = {"✓", "!", "×"}
+MAX_NODES = 12
 
 
 def weakest(*grades):
@@ -49,6 +55,64 @@ def pending(node):
         return datetime.date.fromisoformat(node["liveFrom"]) > datetime.date.today()
     except (KeyError, TypeError, ValueError):
         return False
+
+
+def validate_diagram(diagram, where):
+    """Problems in one diagram. An element with 'claims' is lit: the page colors it by their grades."""
+    if not isinstance(diagram, dict) or not diagram.get("nodes"):
+        return [f"{where}: needs a diagram with nodes"]
+    problems = []
+    nodes, edges = diagram["nodes"], diagram.get("edges", [])
+    ids = [n.get("id") for n in nodes]
+    if len(set(ids)) != len(ids):
+        problems.append(f"{where}: duplicate node ids")
+    if len(nodes) > MAX_NODES:
+        problems.append(f"{where}: {len(nodes)} nodes; keep a diagram to {MAX_NODES} or fewer")
+    cells = {}
+    for n in nodes:
+        problems += [f"{where}: node needs '{key}'" for key in ("id", "label", "col", "row") if key not in n]
+        if n.get("type", "process") not in NODE_TYPES:
+            problems.append(f"{where}: node {n.get('id')} type must be one of {sorted(NODE_TYPES)}")
+        if n.get("status", "same") not in NODE_STATUS:
+            problems.append(f"{where}: node {n.get('id')} status must be one of {sorted(NODE_STATUS)}")
+        if n.get("badge") and n["badge"] not in BADGES:
+            problems.append(f"{where}: node {n.get('id')} badge must be one of {sorted(BADGES)}")
+        cell = (n.get("col"), n.get("row"))
+        if cell in cells:
+            problems.append(f"{where}: nodes {cells[cell]} and {n.get('id')} share grid cell {cell}")
+        cells[cell] = n.get("id")
+    for e in edges:
+        problems += [f"{where}: edge {end} unknown node {e.get(end)}" for end in ("from", "to") if e.get(end) not in ids]
+        if e.get("status", "same") not in EDGE_STATUS:
+            problems.append(f"{where}: edge {e.get('from')}→{e.get('to')} status must be one of {sorted(EDGE_STATUS)}")
+    if not any((el.get("status", "same") != "same" or el.get("claims")) and not el.get("dim") for el in nodes + edges):
+        problems.append(f"{where}: nothing in the diagram is lit; bind an element to claims or give it a status other than 'same'")
+    for lane in diagram.get("lanes", []):
+        if "label" not in lane or len(lane.get("cols", [])) != 2:
+            problems.append(f"{where}: lane needs 'label' and 'cols': [first, last]")
+    for region in diagram.get("regions", []):
+        if "label" not in region or "cols" not in region or "rows" not in region:
+            problems.append(f"{where}: region needs 'label', 'cols', and 'rows'")
+    return problems
+
+
+def elements(item):
+    diagram = item.get("diagram") or {}
+    return diagram.get("nodes", []) + diagram.get("edges", [])
+
+
+def bindings(tree):
+    """Every claim a map or decision names, as written."""
+    for item in tree.get("maps", []) + tree.get("decisions", []):
+        yield from item.get("claims", [])
+        for el in elements(item):
+            yield from el.get("claims", [])
+
+
+def locate(p, name):
+    """A bound name is an id in this tree, or file.json#id for a node in another."""
+    file, sep, cid = name.rpartition("#")
+    return ((p.parent / file).resolve() if sep else p, cid)
 
 
 def validate(tree, where):
@@ -110,6 +174,22 @@ def validate(tree, where):
 
     reach(tree["root"])
     problems += [f"{where}#{cid}: nothing reaches this node" for cid in claims if cid not in seen]
+
+    for kind in ("map", "decision"):
+        for i, item in enumerate(tree.get(kind + "s", []), 1):
+            at = f"{where} {kind} {i}"
+            if not item.get("title"):
+                problems.append(f"{at}: missing 'title'")
+            problems += validate_diagram(item.get("diagram"), at)
+            if kind == "map":
+                continue
+            if not item.get("claims"):
+                problems.append(f"{at}: needs 'claims', the nodes it is about")
+            options = item.get("options", [])
+            if len(options) < 2 or not all(o.get("label") for o in options):
+                problems.append(f"{at}: needs at least 2 options, each with a 'label', recommended first")
+            if not all(pt.get("label") and pt.get("text") for pt in item.get("points", [])):
+                problems.append(f"{at}: each point needs 'label' and 'text'")
     return problems
 
 
@@ -166,6 +246,13 @@ def check(path):
     tree = tree_at(path)
     if tree is not None:
         grade(path, tree["root"], frozenset())
+        for name in dict.fromkeys(bindings(tree)):
+            p, cid = locate(path, name)
+            target = tree_at(p) if p.exists() else None
+            if target is None or cid not in target["claims"]:
+                problems.append(f"{path.name}: a map or decision names '{name}', which does not exist")
+            else:
+                grade(p, cid, frozenset())
     return problems, grades, trees
 
 
@@ -201,17 +288,67 @@ def report(path):
     statement = f"{root}, except: {'; '.join(qs)}." if qs else f"{root}."
     tally = collections.Counter(grades[(path, cid)] for cid, node in claims.items() if "children" not in node)
     counts = ", ".join(f"{tally[g]} {g}" for g in reversed(RANK) if tally[g])
+    lines = [f"Grades: {counts}"]
+    maps, decisions = tree.get("maps", []), tree.get("decisions", [])
+    if maps:
+        drawn = set()
+
+        def cover(cid):
+            drawn.add(cid)
+            for k in claims[cid].get("children", []):
+                cover(k)
+
+        for name in (n for m in maps for el in elements(m) for n in el.get("claims", [])):
+            p, cid = locate(path, name)
+            if p == path:
+                cover(cid)
+        leaves = [cid for cid, node in claims.items() if "children" not in node]
+        missing = [cid for cid in leaves if cid not in drawn]
+        lines.append(f"Maps draw {len(leaves) - len(missing)} of {len(leaves)} leaves." + (f" Not drawn: {', '.join(missing)}" if missing else ""))
+    if decisions:
+        lines.append(f"Open decisions: {len(decisions)}")
     page = {
         "title": f"{path.stem.replace('-', ' ').title()} Claims",
+        "root": root,
         "statement": statement,
         "tally": {g: tally[g] for g in reversed(RANK) if tally[g]},
+        "decisions": [bound(d, path, grades, trees) for d in decisions],
+        "maps": [bound(m, path, grades, trees) for m in maps],
         "tree": nested(path, tree["root"], grades, trees),
     }
-    return [], "\n".join(render(tree["root"], 0) + ["", f"Grades: {counts}", "", statement]), page
+    return [], "\n".join(render(tree["root"], 0) + [""] + lines + ["", statement]), page
+
+
+def bound(item, path, grades, trees):
+    """A map or decision with each named claim filled in, and each drawn element graded by its weakest claim."""
+
+    def cards(names):
+        out = []
+        for key in (locate(path, n) for n in names):
+            node = trees[key[0]]["claims"][key[1]]
+            card = {
+                "id": key[1],
+                "claim": node["claim"],
+                "grade": grades[key],
+                "note": node.get("note"),
+                "source": [github(link) for link in node.get("source", [])],
+                "evidence": [github(link) for link in node.get("evidence", [])],
+            }
+            out.append({k: v for k, v in card.items() if v not in (None, [])})
+        return out
+
+    item = copy.deepcopy(item)
+    if "claims" in item:
+        item["claims"] = cards(item["claims"])
+    for el in elements(item):
+        if el.get("claims"):
+            el["claims"] = cards(el["claims"])
+            el["grade"] = weakest(*[c["grade"] for c in el["claims"]])
+    return item
 
 
 def nested(p, cid, grades, trees):
-    """The node and everything below it, refs inlined, in the shape tree.html draws."""
+    """The node and everything below it, refs inlined, in the shape page.html outlines."""
     node = trees[p]["claims"][cid]
     if "ref" in node:
         file, _, target = node["ref"].partition("#")
@@ -246,10 +383,13 @@ def github(link):
 
 
 def build_html(page):
-    template = (HERE / "tree.html").read_text()
+    template = (HERE / "page.html").read_text()
     # </script> inside a JSON string would end the script block early.
     data = json.dumps(page, ensure_ascii=False).replace("</", "<\\/")
-    return template.replace("{{TITLE}}", page["title"]).replace("{{DATA}}", data)
+    parts = {"TITLE": page["title"], "CSS": (HERE / "flow.css").read_text(), "JS": (HERE / "flow.js").read_text(), "DATA": data}
+    for key, value in parts.items():
+        template = template.replace("{{" + key + "}}", value)
+    return template
 
 
 def self_test():
@@ -270,6 +410,20 @@ def self_test():
         },
     }
     good["claims"]["a"]["reviewed"]["digest"] = digest(good["claims"], "a")
+    box = {"label": "N", "col": 0, "row": 0}
+    good["maps"] = [{
+        "title": "M",
+        "diagram": {
+            "nodes": [{**box, "id": "n", "claims": ["b", "e"]}, {**box, "id": "o", "col": 1, "claims": ["other.json#y"]}],
+            "edges": [{"from": "n", "to": "o"}],
+        },
+    }]
+    good["decisions"] = [{
+        "title": "D",
+        "claims": ["e"],
+        "options": [{"label": "x"}, {"label": "y"}],
+        "diagram": {"nodes": [{**box, "id": "n", "status": "gap"}]},
+    }]
     other = {
         "root": "x",
         "claims": {
@@ -284,6 +438,8 @@ def self_test():
             "a": {"claim": "A", "children": ["a", "z"], "reviewed": {"by": "t", "date": "d"}},
             "b": {"claim": "B", "grade": "proven", "enforcedBy": "agent", "liveFrom": "soon", "source": [{"repo": "r"}]},
         },
+        "maps": [{"diagram": {"nodes": [{"id": "n", "label": "N", "col": 0, "row": 0, "claims": ["nope"]}], "edges": [{"from": "n", "to": "q"}]}}],
+        "decisions": [{"title": "D", "diagram": {"nodes": [{"id": "n", "label": "N", "col": 0, "row": 0}]}}],
     }
     with tempfile.TemporaryDirectory() as d:
         d = pathlib.Path(d)
@@ -295,6 +451,10 @@ def self_test():
         assert g == {"a": "asserted", "b": "proven", "c": "asserted", "d": "proven", "e": "partial"}, g
         _, out, page = report(d / "good.json")
         assert out.endswith("A, except: C (definition not reviewed); E (partial)."), out
+        assert "Maps draw 2 of 3 leaves. Not drawn: d" in out and "Open decisions: 1" in out, out
+        drawn = page["maps"][0]["diagram"]["nodes"]
+        assert [n["grade"] for n in drawn] == ["partial", "proven"], drawn
+        assert page["decisions"][0]["claims"][0]["grade"] == "partial"
         ref = page["tree"]["children"][2]
         assert (ref["id"], ref["ref"], ref["collapsed"]) == ("y", "other.json#y", True), ref
         assert '"grade": "partial"' in build_html(page)
@@ -309,7 +469,12 @@ def self_test():
             "C (definition not reviewed); E (partial)."
         ), out
         problems, _, _ = check(d / "bad.json")
-        for expected in ("needs 'basis'", "'digest'", "'liveFrom'", "'z' does not exist", "nothing reaches", "not 'agent'", "evidence link", "source link", "cycle"):
+        expected_problems = (
+            "needs 'basis'", "'digest'", "'liveFrom'", "'z' does not exist", "nothing reaches", "not 'agent'", "evidence link",
+            "source link", "cycle", "map 1: missing 'title'", "edge to unknown node q", "'nope', which does not exist",
+            "nothing in the diagram is lit", "decision 1: needs 'claims'", "at least 2 options",
+        )
+        for expected in expected_problems:
             assert any(expected in p for p in problems), (expected, problems)
     print("self-test passed")
 
