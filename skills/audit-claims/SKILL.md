@@ -22,8 +22,9 @@ Grade against each repo's default branch, not the local checkout, which may be o
 
 ```bash
 git -C <repo> fetch -q origin
-sha=$(git -C <repo> rev-parse origin/<default branch>)
-git -C <repo> archive "$sha" | tar -x -C <scratch>/<repo>
+branch=$(git -C <repo> ls-remote --symref origin HEAD | sed -n 's|^ref: refs/heads/\(.*\)\tHEAD$|\1|p')
+sha=$(git -C <repo> rev-parse "origin/$branch")
+mkdir -p <scratch>/<repo> && git -C <repo> archive "$sha" | tar -x -C <scratch>/<repo>
 ```
 
 Pin every `source` and `evidence` link to that `sha`.
@@ -50,11 +51,11 @@ What counts:
 
 Skip navigation, legal pages, and brand copy with nothing testable ("the future of onchain finance"), unless the mode names it. In claim mode, a comparative word like "world-class" is decomposed as `claim` does: from what the alternatives offer, named in `basis`.
 
-Write each claim as one declarative sentence about one behavior on one surface, and attach a `source` link to every place we say it. When two places say different things (the docs say $5, the app says $1), keep both as separate leaves with their own sources. That is a finding in itself.
+Write each claim as one declarative sentence about one behavior. When several surfaces say the same thing, that is one leaf with a `source` link for every place we say it. When two places say different things (the docs say $5, the app says $1), keep both as separate leaves with their own sources. That is a finding in itself.
 
 ## 3. Build the trees
 
-Files go in `docs/claims/audit/`, one per area or claim, plus an `index.json` whose root refs each tree. Give `index.json` one map: a fan-out with one node per area, bound to that area's ref, so the cover of the audit is one picture colored by grade.
+Files go in `docs/claims/audit/`, one per area or claim, plus an `index.json` whose root refs each tree. In claim or area mode, add the new tree's ref to the `index.json` that is there, or start one. Give `index.json` one map: a fan-out with one node per area, bound to that area's ref, so the cover of the audit is one picture colored by grade.
 
 - **Area tree:** root "Everything we tell users about <area> is true". The children group claims by feature, at most 7 per branch: nest a feature into sub-branches when it has more. The `basis` names the surfaces read.
 - **Claim tree:** root is the claim. The children cover what the claim needs, from the basis, plus every promise our own surfaces make about it.
@@ -62,7 +63,7 @@ Files go in `docs/claims/audit/`, one per area or claim, plus an `index.json` wh
 
 Draw each tree's map before grading, as `claim` step 4 describes. An area's map is usually the lifecycle of the thing the area is about, with each state and action bound to what we say about it. Ungraded leaves draw grey.
 
-Review: put one `Definition` decision in each tree, asking whether anything is missing or misread, with the tree's map as its diagram. Publish each page and ask. On their yes, delete the decision and stamp `reviewed` with the digest, as `claim` describes. With no person present, leave trees unreviewed: they cap at `asserted`, which is honest for a harvest nobody checked.
+Review: put one `Definition` decision in each tree, asking whether anything is missing or misread, with the tree's map as its diagram. Publish each page and ask. Set the decision's `map` to the map's title. On their yes, delete the decision and stamp `reviewed` with the digest, as `claim` describes. With no person present, write no review decision and leave trees unreviewed: they cap at `asserted`, which is honest for a harvest nobody checked.
 
 ## 4. Grade
 
@@ -80,10 +81,10 @@ Each finding is a decision in its area's tree, worst band first. Merge findings 
 
 - `band` is the band's name below. `title` is the finding in one sentence.
 - `points` are "We say", with where, and "The code does".
-- `options` are "Change the copy" and "Change the code", the cheaper first, each with what it costs.
+- `options` are the realistic fixes, the cheaper first, each with what it costs: "Change the copy", "Change the code", "Add the test" for a claim that is true but unbacked, or "Leave it".
 - The diagram draws the mismatch: the state we describe, the state the code reaches, and each fix as a way out. Bind the leaves in question.
 
-The bands:
+The bands. A finding that fits two goes in the worse one:
 
 1. **False about money, custody, security, tax, or compliance.** A user could lose funds, file wrong, or trust a guarantee we don't keep.
 2. **Advertised but missing.** The feature, export, chain, or integration does not exist.

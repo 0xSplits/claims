@@ -180,9 +180,13 @@ def validate(tree, where):
             at = f"{where} {kind} {i}"
             if not item.get("title"):
                 problems.append(f"{at}: missing 'title'")
-            problems += validate_diagram(item.get("diagram"), at)
             if kind == "map":
+                problems += validate_diagram(item.get("diagram"), at)
                 continue
+            if "map" not in item:
+                problems += validate_diagram(item.get("diagram"), at)
+            elif item["map"] not in [m.get("title") for m in tree.get("maps", [])]:
+                problems.append(f"{at}: 'map' must be the title of one of this tree's maps")
             if not item.get("claims"):
                 problems.append(f"{at}: needs 'claims', the nodes it is about")
             options = item.get("options", [])
@@ -307,12 +311,14 @@ def report(path):
         lines.append(f"Maps draw {len(leaves) - len(missing)} of {len(leaves)} leaves." + (f" Not drawn: {', '.join(missing)}" if missing else ""))
     if decisions:
         lines.append(f"Open decisions: {len(decisions)}")
+    # A decision may show one of the maps instead of carrying its own diagram.
+    by_title = {m["title"]: {"diagram": m["diagram"]} for m in maps}
     page = {
         "title": f"{path.stem.replace('-', ' ').title()} Claims",
         "root": root,
         "statement": statement,
         "tally": {g: tally[g] for g in reversed(RANK) if tally[g]},
-        "decisions": [bound(d, path, grades, trees) for d in decisions],
+        "decisions": [bound({**d, **by_title.get(d.get("map"), {}), "title": d["title"]}, path, grades, trees) for d in decisions],
         "maps": [bound(m, path, grades, trees) for m in maps],
         "tree": nested(path, tree["root"], grades, trees),
     }
@@ -423,7 +429,7 @@ def self_test():
         "claims": ["e"],
         "options": [{"label": "x"}, {"label": "y"}],
         "diagram": {"nodes": [{**box, "id": "n", "status": "gap"}]},
-    }]
+    }, {"title": "D2", "claims": ["a"], "options": [{"label": "x"}, {"label": "y"}], "map": "M"}]
     other = {
         "root": "x",
         "claims": {
@@ -439,7 +445,7 @@ def self_test():
             "b": {"claim": "B", "grade": "proven", "enforcedBy": "agent", "liveFrom": "soon", "source": [{"repo": "r"}]},
         },
         "maps": [{"diagram": {"nodes": [{"id": "n", "label": "N", "col": 0, "row": 0, "claims": ["nope"]}], "edges": [{"from": "n", "to": "q"}]}}],
-        "decisions": [{"title": "D", "diagram": {"nodes": [{"id": "n", "label": "N", "col": 0, "row": 0}]}}],
+        "decisions": [{"title": "D", "diagram": {"nodes": [{"id": "n", "label": "N", "col": 0, "row": 0}]}}, {"title": "E", "map": "nope"}],
     }
     with tempfile.TemporaryDirectory() as d:
         d = pathlib.Path(d)
@@ -451,10 +457,11 @@ def self_test():
         assert g == {"a": "asserted", "b": "proven", "c": "asserted", "d": "proven", "e": "partial"}, g
         _, out, page = report(d / "good.json")
         assert out.endswith("A, except: C (definition not reviewed); E (partial)."), out
-        assert "Maps draw 2 of 3 leaves. Not drawn: d" in out and "Open decisions: 1" in out, out
+        assert "Maps draw 2 of 3 leaves. Not drawn: d" in out and "Open decisions: 2" in out, out
         drawn = page["maps"][0]["diagram"]["nodes"]
         assert [n["grade"] for n in drawn] == ["partial", "proven"], drawn
         assert page["decisions"][0]["claims"][0]["grade"] == "partial"
+        assert page["decisions"][1]["diagram"]["nodes"][1]["grade"] == "proven", page["decisions"][1]
         ref = page["tree"]["children"][2]
         assert (ref["id"], ref["ref"], ref["collapsed"]) == ("y", "other.json#y", True), ref
         assert '"grade": "partial"' in build_html(page)
@@ -472,7 +479,7 @@ def self_test():
         expected_problems = (
             "needs 'basis'", "'digest'", "'liveFrom'", "'z' does not exist", "nothing reaches", "not 'agent'", "evidence link",
             "source link", "cycle", "map 1: missing 'title'", "edge to unknown node q", "'nope', which does not exist",
-            "nothing in the diagram is lit", "decision 1: needs 'claims'", "at least 2 options",
+            "nothing in the diagram is lit", "decision 1: needs 'claims'", "at least 2 options", "decision 2: 'map' must be",
         )
         for expected in expected_problems:
             assert any(expected in p for p in problems), (expected, problems)
