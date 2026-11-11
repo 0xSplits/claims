@@ -3,11 +3,13 @@
 
 Usage: python3 check.py tree.json [--html page.html] [--include STATUS] [--probe]
        python3 check.py tree.json --stale [REV] [--repo CHECKOUT]
+       python3 check.py tree.json --diff REV [--include STATUS]
        python3 check.py tree.json --digest NODE
        python3 check.py --self-test
 
 The grammar and rollup rules are in schema.md, and diagrams are in diagram.md. No dependencies beyond the
-standard library. Exit code 1 and a list of problems on invalid input, on a failed probe, and on stale evidence.
+standard library. Exit code 1 and a list of problems on invalid input, on a failed probe, on stale evidence, and on
+a claim that grades worse than it did at REV.
 """
 import argparse
 import collections
@@ -15,6 +17,7 @@ import copy
 import datetime
 import hashlib
 import json
+import os
 import pathlib
 import shutil
 import subprocess
@@ -387,6 +390,69 @@ def stale(path, trees, rev, checkouts):
     return lines, bool(changed)
 
 
+def standing(path, trees, counted):
+    """For each node under the root: None when it counts toward the root, else the status that keeps it out."""
+    claims, out = trees[path]["claims"], {}
+
+    def walk(cid, why):
+        if cid in out:
+            return
+        out[cid] = why
+        for k in claims[cid].get("children", []):
+            status = status_of(path, k, trees)
+            walk(k, why or (None if status in counted else status))
+
+    walk(trees[path]["root"], None)
+    return out
+
+
+def diff(path, rev, counted):
+    """Grade changes since the tree as committed at rev. Returns (lines, whether a claim that counts got worse)."""
+    problems, grades, trees = check(path, counted)
+    if problems:
+        return problems, True
+    root = repo_root(path)
+    # Every tree this one refs, so the old copy can resolve the same refs.
+    folder = pathlib.Path(os.path.commonpath([p.parent for p in trees])).relative_to(root)
+    listed = git(root, "ls-tree", "-r", "--name-only", rev, "--", str(folder))
+    if listed.returncode:
+        return [f"cannot read {rev}: {listed.stderr.strip()}"], True
+    with tempfile.TemporaryDirectory() as d:
+        d = pathlib.Path(d).resolve()
+        for name in listed.stdout.splitlines():
+            if name.endswith(".json"):
+                (d / name).parent.mkdir(parents=True, exist_ok=True)
+                (d / name).write_text(git(root, "show", f"{rev}:{name}").stdout)
+        old_path = d / path.relative_to(root)
+        if not old_path.exists():
+            return [f"{path.name} is not in {rev}: every claim is new."], False
+        old_problems, old_grades, old_trees = check(old_path, counted)
+        if old_problems:
+            return [f"{path.name} at {rev} does not pass the check, so there is nothing to compare."], False
+        old, new = old_trees[old_path]["claims"], trees[path]["claims"]
+        both = [cid for cid in new if cid in old]
+        step = {cid: RANK.index(grades[(path, cid)]) - RANK.index(old_grades[(old_path, cid)]) for cid in both}
+        statuses = {cid: (status_of(old_path, cid, old_trees), status_of(path, cid, trees)) for cid in both}
+        removed = [f"{cid} (was {old_grades[(old_path, cid)]})" for cid in old if cid not in new]
+        was = {cid: old_grades[(old_path, cid)] for cid in both}
+    out = standing(path, trees, counted)
+
+    def moved(sign):
+        """The deepest nodes that moved: a branch is named only when no child of its explains the move."""
+        hit = {cid for cid in both if step[cid] * sign > 0}
+        return [cid for cid in both if cid in hit and not hit & set(new[cid].get("children", []))]
+
+    lines = []
+    for title, cids in (("Regressed", moved(-1)), ("Improved", moved(1))):
+        if cids:
+            lines.append(f"{title}:")
+            lines += [f"  {cid}: {was[cid]} -> {grades[(path, cid)]}" + (f"  [{out[cid]}]" if out[cid] else "") for cid in cids]
+    changed = [f"{cid} {a} -> {b}" for cid, (a, b) in statuses.items() if a != b]
+    added = [cid for cid in new if cid not in old]
+    lines += [f"{title}: {', '.join(items)}" for title, items in (("Status changed", changed), ("New", added), ("Removed", removed)) if items]
+    return lines or [f"No grade changed since {rev}."], any(not out[cid] for cid in moved(-1))
+
+
 def report(path, counted=("shipped",), probe=False):
     """Returns (problems, text, page, failed probes)."""
     path = path.resolve()
@@ -408,20 +474,9 @@ def report(path, counted=("shipped",), probe=False):
         return [line] + [l for k in node.get("children", []) for l in render(k, depth + 1)]
 
     # Leaves that count toward the root, and how many sit under a child that does not count.
-    live, skipped, seen = [], collections.Counter(), set()
-
-    def walk(cid, out):
-        if cid in seen:
-            return
-        seen.add(cid)
-        if "children" not in claims[cid]:
-            skipped.update([out] if out else [])
-            live.extend([] if out else [cid])
-        for k in claims[cid].get("children", []):
-            status = status_of(path, k, trees)
-            walk(k, out or (None if status in counted else status))
-
-    walk(tree["root"], None)
+    out = {cid: why for cid, why in standing(path, trees, counted).items() if "children" not in claims[cid]}
+    live = [cid for cid, why in out.items() if not why]
+    skipped = collections.Counter(why for why in out.values() if why)
     root = claims[tree["root"]]["claim"]
     qs = list(dict.fromkeys(qualifiers(path, tree["root"], grades, trees, counted, failed)))
     excepts = [text for kind, text in qs if kind == "except"]
@@ -689,6 +744,25 @@ def self_test():
                 "Cannot check, no checkout (pass --repo): acme/other", "No evidence to track: e", "1 unchanged at HEAD.",
             ]
             assert any_stale and lines == want, lines
+            git(repo, "add", ".")
+            git(repo, *commit)
+            claims = pinned["claims"]
+            claims["a"]["children"] = ["b", "c", "e", "g"]
+            claims["c"] = {"claim": "C", "grade": "gap", "note": "n"}
+            claims["e"] = {"claim": "E", "grade": "partial", "enforcedBy": "agent", "note": "n"}
+            claims["g"] = {"claim": "G", "status": "proposed"}
+            del claims["f"]
+            same = diff((repo / "pinned.json").resolve(), "HEAD", ("shipped",))
+            assert same == (["No grade changed since HEAD."], False), same
+            (repo / "pinned.json").write_text(json.dumps(pinned))
+            lines, worse = diff((repo / "pinned.json").resolve(), "HEAD", ("shipped",))
+            want_diff = ["Regressed:", "  c: proven -> gap", "Improved:", "  e: asserted -> partial", "New: g", "Removed: f (was proven)"]
+            assert worse and lines == want_diff, lines
+            claims["c"]["status"] = "planned"
+            (repo / "pinned.json").write_text(json.dumps(pinned))
+            lines, worse = diff((repo / "pinned.json").resolve(), "HEAD", ("shipped",))
+            assert not worse and lines[:2] == ["Regressed:", "  c: proven -> gap  [planned]"], lines
+            assert "Status changed: c shipped -> planned" in lines, lines
             assert stale((repo / "pinned.json").resolve(), trees, sha, [repo]) == (want[2:4] + [f"2 unchanged at {sha}."], False)
     print("self-test passed")
 
@@ -701,6 +775,7 @@ def main():
     parser.add_argument("--include", action="append", default=[], choices=STATUSES[1:], help="also count claims with this status, as if they had shipped")
     parser.add_argument("--probe", action="store_true", help="run every probe; a leaf whose probe fails grades as a gap")
     parser.add_argument("--stale", nargs="?", const="HEAD", metavar="REV", help="name the nodes whose evidence files changed between their pinned commit and REV (default HEAD)")
+    parser.add_argument("--diff", metavar="REV", help="name the claims whose grade changed since the tree committed at REV; exit 1 when one that counts got worse")
     parser.add_argument("--repo", action="append", default=[], type=pathlib.Path, help="a checkout to look evidence up in for --stale (default: the one the tree is in)")
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()
@@ -715,6 +790,10 @@ def main():
         lines, any_stale = stale(args.tree.resolve(), trees, args.stale, args.repo)
         print("\n".join(problems + lines))
         sys.exit(1 if problems or any_stale else 0)
+    if args.diff:
+        lines, worse = diff(args.tree.resolve(), args.diff, ("shipped", *args.include))
+        print("\n".join(lines))
+        sys.exit(1 if worse else 0)
     problems, out, page, failed = report(args.tree, ("shipped", *args.include), args.probe)
     if problems:
         print("\n".join(problems), file=sys.stderr)

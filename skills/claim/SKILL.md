@@ -71,7 +71,7 @@ When the tree has more leaves than 12 nodes can hold, bind a whole branch to the
 python3 <this skill's directory>/check.py <tree>.json
 ```
 
-Add `--probe` when the tree has probes. Fix every problem rather than loosening the data. The script refuses a `proven` leaf without mechanical evidence, a branch with more than 7 children, a dangling child or ref, a cycle, a node nothing reaches, a review without a digest, a map or decision that names a claim that does not exist, and a diagram with nothing lit. It also names the leaves no map draws.
+Add `--probe` when the tree has probes. After grading leaves again, run `check.py <tree>.json --diff <the default branch>` and name every regressed claim in the report. Fix every problem rather than loosening the data. The script refuses a `proven` leaf without mechanical evidence, a branch with more than 7 children, a dangling child or ref, a cycle, a node nothing reaches, a review without a digest, a map or decision that names a claim that does not exist, and a diagram with nothing lit. It also names the leaves no map draws.
 
 ## 6. Report
 

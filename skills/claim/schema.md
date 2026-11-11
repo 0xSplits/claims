@@ -1,6 +1,6 @@
 # Claim tree JSON
 
-One file per root claim, in `docs/claims/`. `check.py` validates it, computes every node's grade, prints the qualified root statement, and with `--html` builds the page. `--stale` and `--probe`, below, re-check a tree that is already graded.
+One file per root claim, in `docs/claims/`. `check.py` validates it, computes every node's grade, prints the qualified root statement, and with `--html` builds the page. `--stale`, `--probe`, and `--diff`, below, re-check a tree that is already graded.
 
 ```json
 {
@@ -94,6 +94,15 @@ A grade is as old as the commit its links are pinned to. `check.py <tree>.json -
 - It looks each link's `repo` up by the origin URL of the checkout the tree is in. Pass `--repo <checkout>` once for every other repo the links name. A repo with no checkout is listed as not checked.
 - A stale node is not wrong. Grade it again against `REV` and pin its links to that commit, which clears it.
 - It also lists the graded leaves with no link to track. Only a full regrade re-checks those.
+
+## Regressions
+
+`check.py <tree>.json --diff REV` grades the tree as it was committed at `REV`, grades it as it is now, and names what changed: the claims that got worse, the ones that got better, each status that changed, and the claims added or removed. It exits 1 when a claim that counts got worse, so it works as a gate on a pull request (`--diff origin/main`).
+
+- Claims are matched by id, so renaming an id reads as one claim removed and one added.
+- A branch is named only when none of its children explains the change, such as a definition reworded since review.
+- A claim that got worse under a `planned`, `proposed`, or `cut` node is listed with that status and does not fail the run. A status change is listed too, so moving a broken claim out of `shipped` is visible to whoever reviews the change.
+- It reads the old copy of the tree and of every tree it refs from git, so the tree has to be in a checkout.
 
 ## Rollup
 
