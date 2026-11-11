@@ -1,6 +1,6 @@
 # Claim tree JSON
 
-One file per root claim, in `docs/claims/`. `check.py` validates it, computes every node's grade, prints the qualified root statement, and with `--html` builds the page.
+One file per root claim, in `docs/claims/`. `check.py` validates it, computes every node's grade, prints the qualified root statement, and with `--html` builds the page. `--stale` and `--probe`, below, re-check a tree that is already graded.
 
 ```json
 {
@@ -20,7 +20,7 @@ One file per root claim, in `docs/claims/`. `check.py` validates it, computes ev
         { "repo": "acme/app", "sha": "1a2b3c4", "path": "src/export/csv.test.ts", "line": 42, "label": "asserts a CSV per table" }
       ]
     },
-    "scheduled": { "claim": "Exports can run on a schedule" },
+    "scheduled": { "claim": "Exports can run on a schedule", "status": "planned" },
     "large": {
       "claim": "Exports finish for tables of any size",
       "grade": "gap",
@@ -35,37 +35,71 @@ One file per root claim, in `docs/claims/`. `check.py` validates it, computes ev
 
 ## Nodes
 
-Every node has `claim`: one declarative sentence. Any node may also have `source`: links, shaped like `evidence` links, to where we make the claim to users (a docs page, a button label, CLI help). A node is exactly one of:
+Every node has `claim`: one declarative sentence. Any node may also have `source`: links, shaped like `evidence` links, to where we make the claim to users (a docs page, a button label, CLI help), and `status`, described below. A node is exactly one of:
 
 | Kind | Fields | Meaning |
 |---|---|---|
 | branch | `children`, `basis`, `reviewed`? | Defined by 1 to 7 child ids. `basis` says where the decomposition came from. |
-| leaf | `grade`, `enforcedBy`?, `evidence`?, `note`?, `liveFrom`? | Checked directly against code. |
+| leaf | `grade`, `enforcedBy`?, `evidence`?, `probe`?, `note`?, `liveFrom`? | Checked directly against code, or against the running system by a probe. |
 | ref | `ref` | Established by another tree: `pricing.json`, or `plans.json#pricing` for a node inside one. Path is relative to this file. |
 | open | none of the above | Not expanded or graded yet. |
 
-`reviewed` is `{ "by", "date", "digest" }`, set only when a person (or a reviewer they named) agreed the children cover the claim. `digest` is what `check.py <tree>.json --digest <id>` prints at that moment. It fingerprints the branch's own claim and its children's, in order, so rewording any of them makes the branch read "definition changed since review" until someone agrees again.
+`reviewed` is `{ "by", "date", "digest" }`, set only when a person (or a reviewer they named) agreed the children cover the claim. `digest` is what `check.py <tree>.json --digest <id>` prints at that moment. It fingerprints the branch's own claim and its children's, in order, so rewording any of them makes the branch read "definition changed since review" until someone agrees again. A `proposed` child is left out of the fingerprint, so writing down an idea does not void the review. Giving it any other status does.
+
+## Status
+
+`status` says whether we make the claim. Any node may set it, and it covers everything under that node. A node without one is `shipped`.
+
+| Status | Meaning | In the rollup |
+|---|---|---|
+| `shipped` | We make this claim today. | Counts. A `gap` here is a bug or a false claim. |
+| `planned` | We have committed to making it. | Does not count. The statement lists it after "Planned:". |
+| `proposed` | An idea nobody has agreed to yet. | Does not count, and the statement leaves it out. |
+| `cut` | We decided not to make it. `note` says why. | Does not count. The statement lists it after "Cut:". |
+
+- A node that is not `shipped` may be any kind. An idea is usually an open node, and a planned feature is usually a branch or a ref to its own tree.
+- A ref that sets no status takes the status of the node it points at. A tree whose root is `planned` therefore stays planned in every tree that refs it.
+- The root of the tree being checked is always graded, whatever its status, so `check.py` on a planned tree shows how far the plan has come.
+- `check.py <tree>.json --include planned` counts planned claims as if they had shipped. The statement is then what we could say once the plans land. `--include` takes any status and can repeat.
 
 ## Leaf grades
 
-- **proven**: a test asserts the claim, or a lint or type rule makes breaking it impossible. Needs `enforcedBy` of `test`, `lint`, or `type` and at least one `evidence` link.
+- **proven**: a test asserts the claim, a lint or type rule makes breaking it impossible, or a probe checks it against the running system. Needs `enforcedBy` of `test`, `lint`, `type`, or `probe`, and at least one `evidence` link or, for a probe, the `probe` itself.
 - **partial**: holds for some cases. `note` names the rest.
 - **asserted**: the code reads as correct, and a comment, doc, or one-off agent or human check says so. Nothing re-checks it on change.
 - **gap**: does not hold. `note` names the ticket or says "No ticket." A gap needs no `evidence`. When the thing is missing, the note says where you searched.
 
 A claim that something is absent ("we do not sync") has no assertion to link, so it is `asserted`, with a note naming the search that found nothing.
 
-`enforcedBy` is one of `test`, `lint`, `type`, `agent`, `review`, `comment`, and a `gap` leaves it out. Only the first three are mechanical, so only they can back `proven`. `agent` means an agent read the code once, `review` means a person did, and `comment` means only a comment or doc says so.
+`enforcedBy` is one of `test`, `lint`, `type`, `probe`, `agent`, `review`, `comment`, and a `gap` leaves it out. Only the first four are mechanical, so only they can back `proven`. `agent` means an agent read the code once, `review` means a person did, and `comment` means only a comment or doc says so.
 
 `liveFrom` is a `YYYY-MM-DD` date for a leaf whose behavior is in the code but not in effect yet, such as a plan enforcement date. Before it the leaf counts as a gap, qualified "live from" that date. From it the leaf's own grade applies, with no edit.
 
 `evidence` links are `{ repo, sha, path, line, label? }`, pinned to the commit that was read. A `source` link may instead be `{ url, label? }` for a web page outside any repo we snapshot, such as another company's docs.
 
+## Probes
+
+Some claims no test in the repo can settle: what a deployed service returns, what live data holds, what another system does. A leaf with `enforcedBy: probe` carries `probe`: `{ "run", "timeout"? }`.
+
+- `run` is a shell command that exits 0 when the claim holds. It runs from the root of the checkout the tree file is in. `timeout` is in seconds, 300 when left out.
+- A probe only reads. It must not change the thing it checks.
+- `check.py <tree>.json --probe` runs every probe in the tree and the trees it refs. A leaf whose probe fails grades as a gap for that run, qualified "probe failed", and the script exits 1.
+- A `gap` leaf may carry a probe as its "done when". `--probe` names it once the probe passes, and the leaf is then graded again by hand.
+- Probes run only with `--probe`. They are shell commands, so read them before running a tree you did not write.
+
+## Stale evidence
+
+A grade is as old as the commit its links are pinned to. `check.py <tree>.json --stale [REV]` names every node with an `evidence` or `source` file that differs between its pinned commit and `REV` (`HEAD` when left out), and exits 1 when it names any.
+
+- It looks each link's `repo` up by the origin URL of the checkout the tree is in. Pass `--repo <checkout>` once for every other repo the links name. A repo with no checkout is listed as not checked.
+- A stale node is not wrong. Grade it again against `REV` and pin its links to that commit, which clears it.
+- It also lists the graded leaves with no link to track. Only a full regrade re-checks those.
+
 ## Rollup
 
-Grades rank `proven` > `partial` > `asserted` > `open` > `gap`. A branch takes its weakest child's grade, capped at `asserted` until it is reviewed and its digest matches. A ref takes the grade of the node it points at.
+Grades rank `proven` > `partial` > `asserted` > `open` > `gap`. A branch takes the weakest grade among its children that count (by default the `shipped` ones), capped at `asserted` until it is reviewed and its digest matches. A branch with no child that counts is `open`. A ref takes the grade of the node it points at.
 
-The qualified statement is the root claim plus everything below it that is not proven: each non-proven leaf, open node, and ref, and each branch that is unreviewed or changed since review.
+The qualified statement is the root claim plus everything below it that counts and is not proven: each non-proven leaf, open node, and ref, and each branch that is unreviewed or changed since review. After that it lists the `planned` and the `cut` children, each by its own claim. The grade tally counts only the leaves that count, and a second line counts the rest by status.
 
 ## The page
 

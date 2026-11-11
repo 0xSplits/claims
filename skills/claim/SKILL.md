@@ -22,6 +22,7 @@ A tree is read as its page, not as text in the reply. `check.py <tree>.json --ht
 ## 1. Find the node to expand
 
 - Run `check.py` on every file in `docs/claims/` and read the results.
+- Run `check.py <tree>.json --stale` on each as well. Grade again every leaf it names, by step 3, and pin its links to the commit you read, before you expand anything.
 - If the claim is already a node in some tree, expand that node. If the argument names a tree or node, use that.
 - Otherwise start a new file whose root is the claim, as an open node.
 - In an existing tree with no node named, take the highest open node or unreviewed branch.
@@ -35,6 +36,7 @@ Write 2 to 7 children for the node. Children come from what the claim means, not
 - Each child is one declarative sentence about one behavior on one surface (backend, web app, API, CLI). A sentence that joins behaviors, tiers, or surfaces is a branch: leave it open for the next level rather than grading it as one leaf.
 - Together the children must make the parent true: if every child held, a skeptic would accept the parent.
 - A child that some tree in `docs/claims/` already establishes becomes a `ref`, not a copy.
+- A child we do not make yet carries a `status`: `planned` when the person has committed to it, `proposed` when it is only an idea. Write an idea the person raises in passing as a `proposed` open node under the branch it belongs to. It needs no review until someone commits to it.
 
 Put the basis in one or two sentences on the node. Then ask the person whether the children cover the claim, as a decision:
 
@@ -54,6 +56,7 @@ For each new child that one behavior or one rule can settle, find the evidence. 
 - `proven` only when you read the assertion or the rule and can link its line. A test that runs the path without asserting the claim is `partial`. So is a guarantee that holds only through a tested function the claim's own code calls.
 - A comment, doc, or one-off agent check with nothing that re-runs it is `asserted`.
 - When the code deliberately does something other than the claim says, grade it `gap` and put what does hold in the note. Do not reword a child to fit the code: propose the new wording to the person and stamp the review again if they agree.
+- When only the running system can settle the claim (a deployed service, live data, another system), write a `probe`: a read-only command that exits 0 when the claim holds. Run it once yourself, then grade the leaf with `enforcedBy: probe`.
 - When the behavior is in the code but takes effect on a known date (a plan enforcement date, a launch), grade what the code will do and set `liveFrom` to that date.
 
 ## 4. Draw the map
@@ -68,7 +71,7 @@ When the tree has more leaves than 12 nodes can hold, bind a whole branch to the
 python3 <this skill's directory>/check.py <tree>.json
 ```
 
-Fix every problem rather than loosening the data. The script refuses a `proven` leaf without mechanical evidence, a branch with more than 7 children, a dangling child or ref, a cycle, a node nothing reaches, a review without a digest, a map or decision that names a claim that does not exist, and a diagram with nothing lit. It also names the leaves no map draws.
+Add `--probe` when the tree has probes. Fix every problem rather than loosening the data. The script refuses a `proven` leaf without mechanical evidence, a branch with more than 7 children, a dangling child or ref, a cycle, a node nothing reaches, a review without a digest, a map or decision that names a claim that does not exist, and a diagram with nothing lit. It also names the leaves no map draws.
 
 ## 6. Report
 

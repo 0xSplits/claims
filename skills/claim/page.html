@@ -79,6 +79,7 @@ details.statement summary { cursor: pointer; }
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const pad2 = (n) => String(n).padStart(2, '0');
   const chip = (g) => `<span class="chip ${g}">${g}</span>`;
+  const status = (n) => (n.status && n.status !== 'shipped' ? `<span class="chip">${esc(n.status)}</span>` : '');
   const byGrade = (cs) => [...cs].sort((a, b) => RANK.indexOf(a.grade) - RANK.indexOf(b.grade));
   const links = (c) => { const ls = [...(c.source || []), ...(c.evidence || [])]; return ls.length ? `<div class="links">${ls.map((l) => `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a>`).join('')}</div>` : ''; };
   const graded = (el) => (el.grade ? { ...el, status: STATUS[el.grade] } : el);
@@ -117,8 +118,8 @@ details.statement summary { cursor: pointer; }
     <div class="detail" id="mdetail${i + 1}" aria-live="polite"></div></div>`));
 
   const outline = (n) => (n.children?.length
-    ? `<details ${n.collapsed ? '' : 'open'}><summary>${chip(n.grade)}${esc(n.name)}${n.review && n.review !== 'reviewed' ? ` <span class="note">(definition ${esc(n.review)})</span>` : ''}</summary><div class="kids">${n.basis ? `<div class="note">Basis: ${esc(n.basis)}</div>` : ''}${n.children.map(outline).join('')}</div></details>`
-    : `<div class="leaf"><span>${chip(n.grade)}</span><div>${esc(n.name)}${n.liveFrom ? ` <span class="note">(live from ${esc(n.liveFrom)})</span>` : ''}${n.note ? `<div class="note">${esc(n.note)}</div>` : ''}${links(n)}</div></div>`);
+    ? `<details ${n.collapsed ? '' : 'open'}><summary>${chip(n.grade)}${status(n)}${esc(n.name)}${n.review && n.review !== 'reviewed' ? ` <span class="note">(definition ${esc(n.review)})</span>` : ''}</summary><div class="kids">${n.basis ? `<div class="note">Basis: ${esc(n.basis)}</div>` : ''}${n.children.map(outline).join('')}</div></details>`
+    : `<div class="leaf"><span>${chip(n.grade)}</span><div>${status(n)}${esc(n.name)}${n.liveFrom ? ` <span class="note">(live from ${esc(n.liveFrom)})</span>` : ''}${n.note ? `<div class="note">${esc(n.note)}</div>` : ''}${links(n)}</div></div>`);
   slide('all', 'every claim', '', `<div class="card one"><div class="text"><div class="kicker"><span>Every claim</span><span>·</span><span>${count(leaves, 'claim')}</span></div></div><div class="outline">${outline(PAGE.tree)}</div></div>`);
 
   D.forEach((d, i) => draw(document.getElementById('dfig' + (i + 1)), d.diagram));
