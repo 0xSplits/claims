@@ -14,7 +14,7 @@ Read `../claim/SKILL.md`, `../claim/schema.md`, and `../claim/diagram.md` first.
 
 Restate the request as the one sentence we would put on the website or in the docs when it ships ("Workspaces can close an accounting period and lock it from edits"). Show it to the person and settle the wording before anything else. Every later step hangs off it.
 
-The tree goes in `docs/claims/<feature>.json`. If the argument names an existing tree, continue from its open nodes.
+The tree goes in `docs/claims/<feature>.json`, with `status: planned` on its root, so a tree that refs it does not count the feature as shipped. If the argument names an existing tree, continue from its open nodes.
 
 ## 2. Decompose to leaves
 
@@ -45,10 +45,11 @@ List every decision the request, spec, and code leave open: numbers and limits, 
 - `options` are the possible answers, your recommendation first, each with what it does to scope.
 - The diagram is the part of the map the answer changes, with each answer drawn as a way out.
 
-Publish and ask. Delete each decision when it is answered. Each answer does one of three things:
+Publish and ask. Delete each decision when it is answered. Each answer does one of four things:
 
 - **Keep:** the leaf stays in scope. Put the decision in its `note`.
-- **Cut:** the leaf stays as a `gap` whose note starts "Out of scope:" with the reason. It then shows in the qualified statement, which becomes the honest launch claim ("…, except: period reopening").
+- **Cut:** set the leaf's `status` to `cut`, with the reason in its `note`. The qualified statement then lists it after "Cut:", which keeps the launch claim honest ("… Cut: period reopening.").
+- **Later:** set the leaf's `status` to `proposed`. It leaves this plan and stays in the tree as an idea.
 - **Reword:** change the claim, then stamp the parent's review again.
 
 Repeat until no leaf rests on a guess.
@@ -63,7 +64,7 @@ Run `check.py` on the tree. Then write `docs/plans/<YYYY-MM-DD>-feat-<feature>-p
 4. **Tasks:** one per in-scope leaf that is not proven. Merge leaves that would change the same files into one task. Each task gives:
    - its leaf ids
    - what to build, in two or three sentences
-   - "Done when": the test, lint, or type rule that would grade the leaf `proven`
+   - "Done when": the test, lint, type rule, or probe that would grade the leaf `proven`
    - what it depends on
 5. **Order:** the tasks in dependency order. Mark the ones that can run in parallel.
 
@@ -82,4 +83,4 @@ Create one ticket per task in the team's tracker, unassigned. Each ticket gets:
 - the "Done when" line
 - a link to the plan doc
 
-Write the ticket ids into the plan's `tickets` field. To track progress, grade the tree again with `claim` after merges: the plan is finished when every in-scope leaf is `proven`.
+Write the ticket ids into the plan's `tickets` field. To track progress, grade the tree again with `claim` after merges: the plan is finished when every in-scope leaf is `proven`. Then delete the root's `status`, and the claim counts as shipped wherever it is reffed.
